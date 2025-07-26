@@ -131,6 +131,11 @@
         <div id="cc-bottom" contenteditable="false">
             如果你喜欢这个小工具可以去<a href="https://ifdian.net/a/leolee9086">我们的爱发电</a> 请我们喝一杯咖啡
             感谢pannellum的作者,推荐使用<a href="https://b3log.org/siyuan/">思源笔记</a>，这个网页本身就是使用思源支持后台服务的。
+            <a href="https://github.com/leolee9086/cc-panoviewer" target="_blank" rel="noopener noreferrer">GitHub 项目地址</a>
+            <a href="https://www.zhihu.com/people/wen-zhi-dao-56" target="_blank" rel="noopener noreferrer">知乎主页</a>
+            <a href="https://www.xiaohongshu.com/discovery/item/688064050000000017033b0f?source=webshare&xhsshare=pc_web&xsec_token=ABwffSm9tG8q7n3DsTW7VqWGAk6LToL0vxg5r6xQpncLw=&xsec_source=pc_share" target="_blank" rel="noopener noreferrer">小红书主页</a>
+            <a href="https://space.bilibili.com/71034467?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer">B站主页</a>
+            <a href="https://qm.qq.com/q/oq68sOKWQg" target="_blank" rel="noopener noreferrer">思源爱好者折腾群</a>
         </div>
         
         <!-- 预览容器 - 改为Vue响应式 -->
