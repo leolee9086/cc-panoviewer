@@ -5,6 +5,12 @@ on:
     branches: [ main, master ]
     paths:
       - 'dist/**'
+  workflow_dispatch: # 允许手动触发
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   deploy:
