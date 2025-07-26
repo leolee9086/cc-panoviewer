@@ -5,6 +5,57 @@ import { DocumentDB } from './document-db.js';
 import { eventBus } from './main.js'; // Import eventBus
 import { handleFileUpload } from './file-handler.js';
 
+/**
+ * 清理UI元素，移除所有可能影响导出的UI状态
+ * @param {Document} doc - 要清理的document对象
+ */
+function cleanupUIElements(doc) {
+    // 移除右键菜单
+    const contextMenu = doc.getElementById('contextMenu');
+    if (contextMenu) {
+        contextMenu.remove();
+    }
+    
+    // 移除视频导出对话框
+    const videoExportDialog = doc.getElementById('videoExportDialog');
+    if (videoExportDialog) {
+        videoExportDialog.remove();
+    }
+    
+    // 移除导出进度显示
+    const exportProgress = doc.getElementById('exportProgress');
+    if (exportProgress) {
+        exportProgress.remove();
+    }
+    
+    // 移除上传提示组件
+    const uploadPrompt = doc.querySelector('.upload-prompt');
+    if (uploadPrompt) {
+        uploadPrompt.remove();
+    }
+    
+    // 清理Vue相关的data属性
+    const vueElements = doc.querySelectorAll('[data-v-]');
+    vueElements.forEach(el => {
+        // 移除Vue的内部属性
+        const attrs = el.getAttributeNames();
+        attrs.forEach(attr => {
+            if (attr.startsWith('data-v-')) {
+                el.removeAttribute(attr);
+            }
+        });
+    });
+    
+    // 移除可能的显示状态样式
+    const styleElements = doc.querySelectorAll('style');
+    styleElements.forEach(style => {
+        if (style.textContent.includes('display: none') || 
+            style.textContent.includes('visibility: hidden')) {
+            style.remove();
+        }
+    });
+}
+
 // 常用分辨率选项（仅用于导出压缩版页面）
 const COMMON_RESOLUTIONS = [
     { label: '4K (3840x1920)', width: 3840, height: 1920 },
@@ -227,9 +278,17 @@ async function exportCompressedPage(resolution) {
     const targetW = resolution.width, targetH = resolution.height;
     const compressed = await compressImage(src, targetW, targetH);
     
-    // 使用干净的document克隆作为蓝本，如果没有则使用当前document
-    const sourceDocument = getCleanDocumentClone() || document;
-    const tempDocument = sourceDocument.cloneNode(true);
+    // 检查干净的document克隆是否存在
+    if (!getCleanDocumentClone()) {
+        throw new Error('干净的document克隆未初始化，无法进行页面导出');
+    }
+    
+    // 使用干净的document克隆作为蓝本
+    const sourceDocument = getCleanDocumentClone().cloneNode(true);
+    const tempDocument = sourceDocument;
+    
+    // 清理UI元素
+    cleanupUIElements(tempDocument);
     
     // 在临时document中创建新的DocumentDB实例
     const tempDb = new DocumentDB(tempDocument, 'cc-panoviewer-db');
