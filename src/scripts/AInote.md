@@ -210,6 +210,93 @@
 - SACAssetsManager项目的 `useThree.js` 相机控制优化
 - SACAssetsManager项目的 `panoramaToVideo.js` 帧处理策略
 
+### 2025-07-26 22:09:23 - 架构重构：数据源统一和临时状态管理
+
+#### 重构背景
+发现现有架构存在数据源混乱问题：
+1. **临时状态持久化**：`storage.getImage('current')` 作为临时状态被错误地存储到DB
+2. **缩略图使用base64**：应该用canvas从DocumentDB数据源绘制
+3. **viewer依赖缩略图**：应该直接从DocumentDB获取数据
+4. **压缩图存储混乱**：压缩图被错误地持久化到DB
+
+#### 重构目标
+- **DocumentDB作为唯一数据源**：只存储原始图片数据和图片编号
+- **临时状态仅在内存中**：压缩图、缩略图等临时状态只在内存维护
+- **currentImage只存储编号**：不存储图片数据，只存储图片ID
+- **按需生成临时数据**：压缩图只在导出时生成，缩略图只在内存中
+
+#### 重构内容
+
+##### 1. storage.js 重构
+- ✅ **移除current图片数据存储**：`setImage('current', data)` 改为 `setCurrentImage(imageId)`
+- ✅ **添加图片ID管理**：`setImage(imageId, data)` 和 `getImage(imageId)`
+- ✅ **添加元数据管理**：`setImageMetadata(imageId, metadata)` 和 `getImageMetadata(imageId)`
+- ✅ **更新迁移工具**：迁移时生成唯一ID并存储原图，只保存编号到currentImage
+
+##### 2. file-handler.js 重构
+- ✅ **上传时只存原图和编号**：生成唯一ID，存储原图到DB，设置currentImage为ID
+- ✅ **缩略图只在内存生成**：`createThumbnail()` 函数生成200x100缩略图，不写入DB
+- ✅ **移除压缩图存储**：不再生成多分辨率压缩图并存储到DB
+- ✅ **简化预览区显示**：只显示缩略图，移除分辨率选择器
+
+##### 3. main.js 重构
+- ✅ **初始化时读取编号**：`storage.getCurrentImage()` 获取当前图片ID
+- ✅ **从DB获取原图**：`storage.getImage(currentImageId)` 获取原图数据
+- ✅ **内存生成缩略图**：`createThumbnail()` 在内存中生成缩略图
+- ✅ **更新预览区**：显示内存中的缩略图
+
+##### 4. event-handlers.js 重构
+- ✅ **缩略图点击使用原图**：点击缩略图时从DB获取原图创建viewer
+- ✅ **视频导出从DB获取**：`startVideoExport()` 直接从DB获取原图数据
+- ✅ **压缩图临时生成**：`exportCompressedPage()` 只在导出时临时生成压缩图
+- ✅ **移除临时数据依赖**：所有操作都从DB原图获取数据
+
+#### 新的数据流架构
+
+##### 图片上传流程
+1. 生成唯一ID：`img_${timestamp}_${random}`
+2. 存储原图：`storage.setImage(imageId, base64data)`
+3. 存储元数据：`storage.setImageMetadata(imageId, metadata)`
+4. 设置当前图片：`storage.setCurrentImage(imageId)`
+5. 内存生成缩略图：`createThumbnail(base64data)`
+6. 显示缩略图到预览区
+
+##### 页面初始化流程
+1. 获取当前图片ID：`storage.getCurrentImage()`
+2. 从DB获取原图：`storage.getImage(currentImageId)`
+3. 内存生成缩略图：`createThumbnail(imageData)`
+4. 显示缩略图到预览区
+5. 创建viewer（使用原图）
+
+##### 缩略图点击流程
+1. 获取当前图片ID：`storage.getCurrentImage()`
+2. 从DB获取原图：`storage.getImage(currentImageId)`
+3. 创建viewer（使用原图）
+
+##### 视频导出流程
+1. 获取当前图片ID：`storage.getCurrentImage()`
+2. 从DB获取原图：`storage.getImage(currentImageId)`
+3. 使用原图进行视频导出
+
+##### 压缩版页面导出流程
+1. 获取当前图片ID：`storage.getCurrentImage()`
+2. 从DB获取原图：`storage.getImage(currentImageId)`
+3. 临时生成压缩图：`compressImage(src, width, height)`
+4. 写入导出HTML（不存储到DB）
+
+#### 技术优势
+- **数据源统一**：所有图片数据都来自DocumentDB的原始图片
+- **临时状态清晰**：压缩图、缩略图等临时状态只在内存中
+- **性能优化**：避免重复存储压缩图和缩略图
+- **架构简洁**：currentImage只存储编号，逻辑清晰
+- **按需生成**：压缩图只在需要时生成，不占用存储空间
+
+#### 解决的问题
+- ✅ **下载后页面加载异常**：页面初始化时正确从DB读取原图
+- ✅ **视频导出显示没有图片数据**：直接从DB获取原图数据
+- ✅ **缩略图切换清晰度问题**：缩略图固定200x100，不切换清晰度
+- ✅ **临时状态持久化问题**：所有临时状态都在内存中
+
 ## 下一步计划
 1. 第三阶段：实现高级功能（撤销/重做、数据导出、性能优化）
 2. 第四阶段：文档清理和性能监控
@@ -221,4 +308,6 @@
 - 所有存储操作都通过统一的 `storage` 接口
 - 保持向后兼容，支持原有的全局变量和DOM存储
 - 使用事务确保数据一致性
-- 记录操作历史便于调试和用户行为分析 
+- 记录操作历史便于调试和用户行为分析
+- DocumentDB只存储原始图片数据和图片编号
+- 临时状态（压缩图、缩略图）只在内存中维护 

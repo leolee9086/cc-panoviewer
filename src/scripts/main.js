@@ -5,6 +5,28 @@ import { handleFileUpload } from './file-handler.js';
 import { storage, migrationTools } from './storage.js';
 
 /**
+ * 生成缩略图（仅在内存中，不写入DB）
+ * @param {string} src - 原始图片base64
+ * @param {number} width - 缩略图宽度，默认200
+ * @param {number} height - 缩略图高度，默认100
+ * @returns {Promise<string>} - 缩略图base64
+ */
+function createThumbnail(src, width = 200, height = 100) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = function () {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.src = src;
+    });
+}
+
+/**
  * 应用主入口
  */
 function initApp() {
@@ -24,27 +46,35 @@ function initApp() {
     setupEventListeners();
     
     // 页面加载完成后的初始化
-    window.onload = () => {
-        // 优先从存储中获取图片数据
-        let imageData = storage.getImage('current');
+    window.onload = async () => {
+        // 获取当前图片编号
+        const currentImageId = storage.getCurrentImage();
         
-        // 如果没有存储数据，尝试从全局变量获取
-        if (!imageData && window.imageData) {
-            imageData = window.imageData;
-            // 迁移到存储中
-            storage.setImage('current', imageData);
-        }
-        
-        if (imageData) {
-            const viewer = createViewer('panorama', {
-                "type": "equirectangular",
-                "panorama": imageData,
-                "autoLoad": true,
-                "showControls": true,
-                "autoRotate": true
-            });
+        if (currentImageId) {
+            // 从DB获取原图数据
+            const imageData = storage.getImage(currentImageId);
             
-            document.getElementById('uploadPrompt').style.display = 'none';
+            if (imageData) {
+                // 在内存中生成缩略图（不写入DB）
+                const thumbnailData = await createThumbnail(imageData);
+                
+                // 更新预览区显示缩略图
+                document.getElementById('previewContainer').innerHTML = `
+                    <img id="previewImage" src="${thumbnailData}" alt="Preview" style="max-width: 200px; max-height: 100px; cursor: pointer;">
+                    <button id="uploader">添加图片</button>
+                `;
+                
+                // 创建查看器（使用原图）
+                const viewer = createViewer('panorama', {
+                    "type": "equirectangular",
+                    "panorama": imageData,
+                    "autoLoad": true,
+                    "showControls": true,
+                    "autoRotate": true
+                });
+                
+                document.getElementById('uploadPrompt').style.display = 'none';
+            }
         }
     };
 }

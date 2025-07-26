@@ -4,7 +4,7 @@ import { downloadPage } from './download-utils.js';
 import { storage } from './storage.js';
 import { PanoramaVideoGenerator, saveVideoBlob } from './panorama-exporter.js';
 
-// 常用分辨率选项
+// 常用分辨率选项（仅用于导出压缩版页面）
 const COMMON_RESOLUTIONS = [
     { label: '4K (3840x1920)', width: 3840, height: 1920 },
     { label: '2K (1920x960)', width: 1920, height: 960 },
@@ -13,7 +13,7 @@ const COMMON_RESOLUTIONS = [
     { label: '480p (640x320)', width: 640, height: 320 },
 ];
 
-// 压缩图片到指定分辨率
+// 压缩图片到指定分辨率（仅用于导出压缩版页面）
 function compressImage(src, width, height) {
     return new Promise((resolve) => {
         const img = new Image();
@@ -120,16 +120,18 @@ function getResolutionSettings() {
 async function startVideoExport() {
     if (isExporting) return;
     
-    // 获取当前图片数据
-    let imageData = storage.getImage('current');
+    // 获取当前图片编号
+    const currentImageId = storage.getCurrentImage();
+    if (!currentImageId) {
+        alert('没有找到可导出的图片');
+        return;
+    }
+    
+    // 从DB获取原图数据
+    const imageData = storage.getImage(currentImageId);
     if (!imageData) {
-        if (window.imageData) {
-            imageData = window.imageData;
-            storage.setImage('current', imageData);
-        } else {
-            alert('没有找到可导出的图片数据');
-            return;
-        }
+        alert('没有找到可导出的图片数据');
+        return;
     }
     
     const settings = getResolutionSettings();
@@ -166,6 +168,7 @@ async function startVideoExport() {
             duration: settings.duration,
             fps: settings.fps,
             rotations: settings.rotations,
+            imageId: currentImageId,
             timestamp: Date.now()
         });
         
@@ -198,44 +201,15 @@ function cancelVideoExport() {
 
 // 导出压缩版页面
 async function exportCompressedPage(resolution) {
-    // 获取图片数据 - 优先从存储中获取
-    let src = storage.getImage('current');
-    
-    // 如果没有存储数据，检查其他位置
-    if (!src) {
-        // 1. 检查window.imageData
-        if (window.imageData) {
-            src = window.imageData;
-            // 迁移到存储中
-            storage.setImage('current', src);
-        }
-        // 2. 检查HTML中script标签的图片数据
-        else {
-            const scriptElement = document.querySelector('.images');
-            if (scriptElement && scriptElement.textContent.includes('window.imageData = ')) {
-                try {
-                    // 尝试解析转义字符格式的base64数据
-                    const match = scriptElement.textContent.match(/window\.imageData = "([^"]+)"/);
-                    if (match) {
-                        src = match[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\').replace(/\\n/g, '\n').replace(/\\r/g, '\r');
-                        // 迁移到存储中
-                        storage.setImage('current', src);
-                    }
-                } catch (e) {
-                    // 如果解析失败，尝试旧的格式
-                    if (scriptElement.textContent.includes('window.imageData = "')) {
-                        const match = scriptElement.textContent.match(/window\.imageData = "([^"]+)"/);
-                        if (match) {
-                            src = match[1];
-                            // 迁移到存储中
-                            storage.setImage('current', src);
-                        }
-                    }
-                }
-            }
-        }
+    // 获取当前图片编号
+    const currentImageId = storage.getCurrentImage();
+    if (!currentImageId) {
+        alert('没有找到可导出的图片');
+        return;
     }
     
+    // 从DB获取原图数据
+    const src = storage.getImage(currentImageId);
     if (!src) {
         alert('没有找到可导出的图片数据');
         return;
@@ -244,18 +218,13 @@ async function exportCompressedPage(resolution) {
     // 记录导出操作历史
     storage.addHistory('export_compressed', {
         resolution: resolution,
+        imageId: currentImageId,
         timestamp: Date.now()
     });
     
-    // 先解码原图尺寸
-    const img = new Image();
-    img.src = src;
-    await new Promise(r=>img.onload=r);
+    // 临时生成压缩图（不写入DB）
     const targetW = resolution.width, targetH = resolution.height;
     const compressed = await compressImage(src, targetW, targetH);
-    
-    // 保存压缩版本到缓存
-    storage.setImage('compressed', compressed);
     
     // 创建临时克隆版document
     const tempDocument = document.cloneNode(true);
@@ -351,15 +320,24 @@ function setupPreviewContainer() {
     const previewContainer = document.getElementById('previewContainer');
     
     previewContainer.addEventListener('click', (e) => {
-        if (e.target.src) {
-            const viewer = createViewer('panorama', {
-                "type": "equirectangular",
-                "panorama": e.target.src,
-                "autoLoad": true,
-                "showControls": true,
-                "autoRotate": true,
-                "hotSpots": []
-            });
+        if (e.target.src && e.target.id === 'previewImage') {
+            // 获取当前图片编号
+            const currentImageId = storage.getCurrentImage();
+            if (currentImageId) {
+                // 从DB获取原图数据
+                const imageData = storage.getImage(currentImageId);
+                if (imageData) {
+                    // 创建viewer（使用原图）
+                    const viewer = createViewer('panorama', {
+                        "type": "equirectangular",
+                        "panorama": imageData,
+                        "autoLoad": true,
+                        "showControls": true,
+                        "autoRotate": true,
+                        "hotSpots": []
+                    });
+                }
+            }
         } else if (e.target === document.getElementById('uploader')) {
             const input = document.createElement('input');
             input.type = 'file';

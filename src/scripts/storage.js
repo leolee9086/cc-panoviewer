@@ -2,6 +2,11 @@
  * @织: 统一存储模块 - 基于 DocumentDB 的便捷存储接口
  * 提供图片、配置、历史记录等分类存储方法
  * 支持事务包装和智能缓存管理
+ * 
+ * 重构说明：
+ * - DocumentDB只存储原始图片数据和图片编号
+ * - 压缩图、缩略图等临时状态只在内存中维护
+ * - currentImage只存储图片编号，不存储图片数据
  */
 import { DocumentDB } from './document-db.js';
 
@@ -18,19 +23,47 @@ function ensureDbReady() {
  */
 export const storage = {
     /**
-     * 设置图片数据
-     * @param {string} key - 图片键名
+     * 设置图片数据（使用唯一ID）
+     * @param {string} imageId - 图片唯一ID
      * @param {string} data - 图片数据（base64格式）
      */
-    setImage: (key, data) => ensureDbReady().set(`image.${key}`, data, { type: 'base64' }),
+    setImage: (imageId, data) => ensureDbReady().set(`image.${imageId}`, data, { type: 'base64' }),
     
     /**
-     * 获取图片数据
-     * @param {string} key - 图片键名
+     * 获取图片数据（使用唯一ID）
+     * @param {string} imageId - 图片唯一ID
      * @param {string} defaultValue - 默认值
      * @returns {string} 图片数据
      */
-    getImage: (key, defaultValue = null) => ensureDbReady().get(`image.${key}`, defaultValue),
+    getImage: (imageId, defaultValue = null) => ensureDbReady().get(`image.${imageId}`, defaultValue),
+    
+    /**
+     * 设置图片元数据
+     * @param {string} imageId - 图片唯一ID
+     * @param {Object} metadata - 元数据
+     */
+    setImageMetadata: (imageId, metadata) => ensureDbReady().set(`image.${imageId}.metadata`, metadata),
+    
+    /**
+     * 获取图片元数据
+     * @param {string} imageId - 图片唯一ID
+     * @param {Object} defaultValue - 默认值
+     * @returns {Object} 元数据
+     */
+    getImageMetadata: (imageId, defaultValue = null) => ensureDbReady().get(`image.${imageId}.metadata`, defaultValue),
+    
+    /**
+     * 设置当前图片编号（不存储图片数据）
+     * @param {string} imageId - 当前图片的编号
+     */
+    setCurrentImage: (imageId) => ensureDbReady().set('currentImage', imageId),
+    
+    /**
+     * 获取当前图片编号
+     * @param {string} defaultValue - 默认值
+     * @returns {string} 当前图片编号
+     */
+    getCurrentImage: (defaultValue = null) => ensureDbReady().get('currentImage', defaultValue),
     
     /**
      * 设置配置项
@@ -229,8 +262,11 @@ export const migrationTools = {
      * 从全局变量迁移数据
      */
     migrateGlobalData: () => {
-        if (window.imageData && !storage.getImage('current')) {
-            storage.setImage('current', window.imageData);
+        if (window.imageData && !storage.getCurrentImage()) {
+            // 生成唯一ID并存储原图
+            const imageId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            storage.setImage(imageId, window.imageData);
+            storage.setCurrentImage(imageId);
             console.log('已迁移全局图片数据到 DocumentDB');
         }
     },
@@ -245,7 +281,10 @@ export const migrationTools = {
                 const match = scriptElement.textContent.match(/window\.imageData = "([^"]+)"/);
                 if (match) {
                     const imageData = match[1];
-                    storage.setImage('current', imageData);
+                    // 生成唯一ID并存储原图
+                    const imageId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    storage.setImage(imageId, imageData);
+                    storage.setCurrentImage(imageId);
                     console.log('已迁移DOM图片数据到 DocumentDB');
                 }
             } catch (e) {

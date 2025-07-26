@@ -2,7 +2,7 @@ import { createViewer } from './viewer-manager.js';
 import { storage } from './storage.js';
 
 /**
- * 常用分辨率选项
+ * 常用分辨率选项（仅用于导出压缩版页面）
  */
 const COMMON_RESOLUTIONS = [
     { label: '原图', width: null, height: null },
@@ -14,7 +14,7 @@ const COMMON_RESOLUTIONS = [
 ];
 
 /**
- * 压缩图片到指定分辨率
+ * 压缩图片到指定分辨率（仅用于导出压缩版页面）
  * @param {string} src - 原始图片base64
  * @param {number|null} width - 目标宽度
  * @param {number|null} height - 目标高度
@@ -41,6 +41,36 @@ function compressImage(src, width, height) {
 }
 
 /**
+ * 生成缩略图（仅在内存中，不写入DB）
+ * @param {string} src - 原始图片base64
+ * @param {number} width - 缩略图宽度，默认200
+ * @param {number} height - 缩略图高度，默认100
+ * @returns {Promise<string>} - 缩略图base64
+ */
+function createThumbnail(src, width = 200, height = 100) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = function () {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.src = src;
+    });
+}
+
+/**
+ * 生成唯一图片ID
+ * @returns {string} 唯一ID
+ */
+function generateImageId() {
+    return `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
  * 处理图片文件上传
  * @param {File} file - 上传的文件
  */
@@ -63,6 +93,9 @@ function handleImageFile(file) {
     reader.onload = async function (e) {
         const base64data = e.target.result;
         
+        // 生成唯一图片ID
+        const imageId = generateImageId();
+        
         // 保存文件元数据
         const metadata = {
             name: file.name,
@@ -71,67 +104,47 @@ function handleImageFile(file) {
             uploadTime: Date.now()
         };
         
-        // 使用事务保存文件数据
+        // 使用事务保存文件数据到DB
         storage.withTransaction(async () => {
-            // 保存文件元数据
+            // 保存原始图片数据
+            storage.setImage(imageId, base64data);
+            storage.setImageMetadata(imageId, metadata);
+            
+            // 设置当前图片编号
+            storage.setCurrentImage(imageId);
+            
+            // 保存文件元数据到历史记录
             const history = storage.getFile('uploadHistory', []);
             history.push(metadata);
             storage.setFile('uploadHistory', history);
-            storage.setFile('current', metadata);
-            
-            // 保存原始图片数据
-            storage.setImage('original', base64data);
         });
         
-        // 生成多分辨率压缩图
-        const compressedList = await Promise.all(
-            COMMON_RESOLUTIONS.map(async (item) => ({
-                label: item.label,
-                base64: item.width ? await compressImage(base64data, item.width, item.height) : base64data
-            }))
-        );
+        // 在内存中生成缩略图（不写入DB）
+        const thumbnailData = await createThumbnail(base64data);
         
-        // 保存压缩版本到缓存
-        storage.setFile('compressedCache', compressedList);
-        
-        // 预览区提供分辨率选择
-        let selectHtml = '<select id="resolutionSelect">';
-        compressedList.forEach((item, idx) => {
-            selectHtml += `<option value="${idx}">${item.label}</option>`;
-        });
-        selectHtml += '</select>';
+        // 更新预览区显示缩略图
         document.getElementById('previewContainer').innerHTML = `
-            <div style="margin-bottom:8px;">选择分辨率：${selectHtml}</div>
-            <img id="previewImage" src="${compressedList[0].base64}" alt="Preview">
-        ` + document.getElementById('previewContainer').innerHTML;
+            <img id="previewImage" src="${thumbnailData}" alt="Preview" style="max-width: 200px; max-height: 100px; cursor: pointer;">
+            <button id="uploader">添加图片</button>
+        `;
         
-        // 选择分辨率时切换预览
-        document.getElementById('resolutionSelect').addEventListener('change', function () {
-            const idx = this.value;
-            document.getElementById('previewImage').src = compressedList[idx].base64;
-            // 保存当前选择的图片数据
-            storage.setImage('current', compressedList[idx].base64);
-        });
-        
-        // 创建查看器
+        // 创建查看器（使用原图）
         const viewer = createViewer('panorama', {
             "type": "equirectangular",
-            "panorama": compressedList[0].base64,
+            "panorama": base64data,
             "autoLoad": true,
             "showControls": true,
             "autoRotate": true,
             "hotSpots": []
         });
         
-        // 保存当前图片数据
-        storage.setImage('current', compressedList[0].base64);
-        
         // 记录操作历史
         storage.addHistory('file_upload', {
             fileName: file.name,
             fileSize: file.size,
-            resolution: 'original'
+            imageId: imageId
         });
+        
         document.getElementById('uploadPrompt').style.display = 'none';
     };
     reader.readAsDataURL(file);
@@ -168,48 +181,32 @@ async function handleHTMLFile(file) {
         }
         
         if (base64data) {
-            // 保存到统一存储
-            storage.setImage('original', base64data);
-            storage.setImage('current', base64data);
+            // 生成唯一图片ID
+            const imageId = generateImageId();
             
-            // 生成多分辨率压缩图
-            const compressedList = await Promise.all(
-                COMMON_RESOLUTIONS.map(async (item) => ({
-                    label: item.label,
-                    base64: item.width ? await compressImage(base64data, item.width, item.height) : base64data
-                }))
-            );
-            
-            // 保存压缩版本到缓存
-            storage.setFile('compressedCache', compressedList);
-            
-            // 预览区提供分辨率选择
-            let selectHtml = '<select id="resolutionSelect">';
-            compressedList.forEach((item, idx) => {
-                selectHtml += `<option value="${idx}">${item.label}</option>`;
+            // 保存到DB
+            storage.setImage(imageId, base64data);
+            storage.setImageMetadata(imageId, {
+                name: file.name,
+                size: file.size,
+                type: 'text/html',
+                uploadTime: Date.now()
             });
-            selectHtml += '</select>';
+            storage.setCurrentImage(imageId);
             
-            // 从统一存储获取当前图片数据
-            const currentImageData = storage.getImage('current');
+            // 在内存中生成缩略图（不写入DB）
+            const thumbnailData = await createThumbnail(base64data);
+            
+            // 更新预览区显示缩略图
             document.getElementById('previewContainer').innerHTML = `
-                <div style="margin-bottom:8px;">选择分辨率：${selectHtml}</div>
-                <img id="previewImage" src="${currentImageData}" alt="Preview">
-            ` + document.getElementById('previewContainer').innerHTML;
+                <img id="previewImage" src="${thumbnailData}" alt="Preview" style="max-width: 200px; max-height: 100px; cursor: pointer;">
+                <button id="uploader">添加图片</button>
+            `;
             
-            // 选择分辨率时切换预览
-            document.getElementById('resolutionSelect').addEventListener('change', function () {
-                const idx = this.value;
-                const selectedImageData = compressedList[idx].base64;
-                document.getElementById('previewImage').src = selectedImageData;
-                // 保存当前选择的图片数据
-                storage.setImage('current', selectedImageData);
-            });
-            
-            // 创建查看器
+            // 创建查看器（使用原图）
             const viewer = createViewer('panorama', {
                 "type": "equirectangular",
-                "panorama": currentImageData,
+                "panorama": base64data,
                 "sceneFadeDuration": 1000,
                 "autoLoad": true,
                 "showControls": true,
@@ -227,7 +224,7 @@ async function handleHTMLFile(file) {
             storage.addHistory('html_file_upload', {
                 fileName: file.name,
                 fileSize: file.size,
-                resolution: 'original'
+                imageId: imageId
             });
             
             document.getElementById('uploadPrompt').style.display = 'none';
