@@ -137,7 +137,8 @@ async function startVideoExport() {
             fps: settings.fps,
             rotations: settings.rotations,
             width: settings.width,
-            height: settings.height
+            height: settings.height,
+            orientation: settings.orientation
         });
         
         // 保存视频
@@ -147,6 +148,7 @@ async function startVideoExport() {
         // 记录导出历史
         storage.addHistory('export_video', {
             resolution: `${settings.width}x${settings.height}`,
+            orientation: settings.orientation,
             duration: settings.duration,
             fps: settings.fps,
             rotations: settings.rotations,

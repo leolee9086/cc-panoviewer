@@ -3,6 +3,23 @@
 import * as THREE from 'three';
 import { Muxer, ArrayBufferTarget, MP4Muxer, MP4ArrayBufferTarget } from './useVideoMuxer.js';
 
+/**
+ * @织: 确保分辨率为偶数（H264编码器要求）
+ * @param {number} width - 宽度
+ * @param {number} height - 高度
+ * @returns {Object} 调整后的宽度和高度
+ */
+function ensureEvenDimensions(width, height) {
+    const adjustedWidth = width % 2 === 0 ? width : width - 1;
+    const adjustedHeight = height % 2 === 0 ? height : height - 1;
+    
+    if (adjustedWidth !== width || adjustedHeight !== height) {
+        console.warn(`分辨率已调整为偶数: ${width}x${height} -> ${adjustedWidth}x${adjustedHeight}`);
+    }
+    
+    return { width: adjustedWidth, height: adjustedHeight };
+}
+
 // 常量配置对象
 const Constants = {
     DEFAULT_VALUES: {
@@ -24,7 +41,7 @@ const Constants = {
         SAMPLES: 8
     },
     CAMERA_CONFIG: {
-        PORTRAIT_FOV: 90,
+        PORTRAIT_FOV: 75,  // 竖向视频使用更小的FOV以获得更好的效果
         LANDSCAPE_FOV: 75
     },
     SPHERE_CONFIG: {
@@ -306,8 +323,11 @@ class VideoEncoderManager {
     constructor(options) {
         const { width, height, fps, format } = options;
         
-        this.width = width;
-        this.height = height;
+        // 确保分辨率为偶数（H264编码器要求）
+        const { width: adjustedWidth, height: adjustedHeight } = ensureEvenDimensions(width, height);
+        
+        this.width = adjustedWidth;
+        this.height = adjustedHeight;
         this.fps = fps;
         this.format = format;
         
@@ -575,6 +595,15 @@ export class PanoramaVideoGenerator {
         const material = new THREE.MeshBasicMaterial({ map: texture });
         const sphere = new THREE.Mesh(geometry, material);
         this.scene.add(sphere);
+        
+        // 根据视频方向设置相机
+        this.setupCamera();
+    }
+
+    /**
+     * 设置相机
+     */
+    setupCamera() {
         const aspect = this.width / this.height;
         const isPortrait = this.height > this.width;
         const fov = isPortrait ? Constants.CAMERA_CONFIG.PORTRAIT_FOV : Constants.CAMERA_CONFIG.LANDSCAPE_FOV;
@@ -598,11 +627,9 @@ export class PanoramaVideoGenerator {
         this.width = width;
         this.height = height;
         this.renderer.setSize(width, height);
-        const aspect = width / height;
-        const isPortrait = height > width;
-        this.camera.fov = isPortrait ? Constants.CAMERA_CONFIG.PORTRAIT_FOV : Constants.CAMERA_CONFIG.LANDSCAPE_FOV;
-        this.camera.aspect = aspect;
-        this.camera.updateProjectionMatrix();
+        
+        // 重新设置相机
+        this.setupCamera();
     }
 
     /**
@@ -622,7 +649,8 @@ export class PanoramaVideoGenerator {
             smoothness = 0.8,
             width = this.width,
             height = this.height,
-            format = 'mp4'
+            format = 'mp4',
+            orientation = 'landscape'
         } = options;
 
         this.videoFormat = format;
@@ -642,7 +670,8 @@ export class PanoramaVideoGenerator {
         // 传递进度回调
         encoderManager.setProgressCallback(this.progressCallback);
 
-        const cameraPositions = computeSphereTrajectory({
+        // 根据视频方向调整轨迹参数
+        let trajectoryOptions = {
             totalFrames,
             startLon,
             endLon,
@@ -650,7 +679,16 @@ export class PanoramaVideoGenerator {
             endLat,
             rotations,
             smoothness
-        });
+        };
+
+        // 竖向视频使用更合适的轨迹参数
+        if (orientation === 'portrait') {
+            // 竖向视频通常需要更慢的旋转和更小的纬度变化
+            trajectoryOptions.rotations = Math.min(rotations, 1.5);
+            trajectoryOptions.endLat = Math.min(endLat, 30); // 限制纬度变化
+        }
+
+        const cameraPositions = computeSphereTrajectory(trajectoryOptions);
 
         try {
             const frameGenerator = async (frame) => {

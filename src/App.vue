@@ -35,12 +35,20 @@
             <div class="dialog-content">
                 <h3>导出全景视频</h3>
                 <div class="form-group">
+                    <label>视频方向:</label>
+                    <select v-model="videoSettings.orientation" @change="handleVideoOrientationChange">
+                        <option value="landscape">横向视频</option>
+                        <option value="portrait">竖向视频</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>分辨率:</label>
                     <select v-model="videoSettings.resolution">
-                        <option value="720p">720p (1280x720)</option>
-                        <option value="1080p">1080p (1920x1080)</option>
-                        <option value="2K">2K (2560x1440)</option>
-                        <option value="4K">4K (3840x2160)</option>
+                        <option v-for="(resolution, index) in currentVideoResolutions" 
+                                :key="index" 
+                                :value="resolution.value">
+                            {{ resolution.label }}
+                        </option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -171,10 +179,58 @@ const messageType = ref('info');
 
 // 视频设置
 const videoSettings = ref({
+    orientation: 'landscape',
     resolution: '1080p',
     duration: 10,
     fps: 30,
     rotations: 1
+});
+
+// 横向分辨率选项
+const LANDSCAPE_VIDEO_RESOLUTIONS = [
+    { value: '720p', label: '720p (1280x720)', width: 1280, height: 720 },
+    { value: '1080p', label: '1080p (1920x1080)', width: 1920, height: 1080 },
+    { value: '2K', label: '2K (2560x1440)', width: 2560, height: 1440 },
+    { value: '4K', label: '4K (3840x2160)', width: 3840, height: 2160 }
+];
+
+// 竖向分辨率选项（以设备名称显示）
+const PORTRAIT_VIDEO_RESOLUTIONS = [
+    { value: 'iphone15pro', label: 'iPhone 15 Pro (1178x2556)', width: 1178, height: 2556 },
+    { value: 'iphone15', label: 'iPhone 15 (1170x2532)', width: 1170, height: 2532 },
+    { value: 'iphone14pro', label: 'iPhone 14 Pro (1178x2556)', width: 1178, height: 2556 },
+    { value: 'iphone14', label: 'iPhone 14 (1170x2532)', width: 1170, height: 2532 },
+    { value: 'iphone13pro', label: 'iPhone 13 Pro (1170x2532)', width: 1170, height: 2532 },
+    { value: 'iphone13', label: 'iPhone 13 (1170x2532)', width: 1170, height: 2532 },
+    { value: 'iphone12pro', label: 'iPhone 12 Pro (1170x2532)', width: 1170, height: 2532 },
+    { value: 'iphone12', label: 'iPhone 12 (1170x2532)', width: 1170, height: 2532 },
+    { value: 'iphonese', label: 'iPhone SE (750x1334)', width: 750, height: 1334 },
+    { value: 'samsunggalaxys24', label: 'Samsung Galaxy S24 (1080x2340)', width: 1080, height: 2340 },
+    { value: 'samsunggalaxys23', label: 'Samsung Galaxy S23 (1080x2340)', width: 1080, height: 2340 },
+    { value: 'samsunggalaxys22', label: 'Samsung Galaxy S22 (1080x2340)', width: 1080, height: 2340 },
+    { value: 'googlepixel8', label: 'Google Pixel 8 (1080x2400)', width: 1080, height: 2400 },
+    { value: 'googlepixel7', label: 'Google Pixel 7 (1080x2400)', width: 1080, height: 2400 },
+    { value: 'oneplus11', label: 'OnePlus 11 (1440x3216)', width: 1440, height: 3216 },
+    { value: 'xiaomi14', label: 'Xiaomi 14 (1440x3200)', width: 1440, height: 3200 },
+    { value: 'huaweip60', label: 'Huawei P60 (1212x2616)', width: 1212, height: 2616 },
+    { value: 'oppofindx6', label: 'OPPO Find X6 (1240x2772)', width: 1240, height: 2772 },
+    { value: 'vivox90', label: 'vivo X90 (1260x2800)', width: 1260, height: 2800 },
+    { value: 'douyin', label: '抖音短视频 (1080x1920)', width: 1080, height: 1920 },
+    { value: 'kuaishou', label: '快手短视频 (1080x1920)', width: 1080, height: 1920 },
+    { value: 'wechatvideo', label: '微信视频号 (1080x1920)', width: 1080, height: 1920 },
+    { value: 'xiaohongshu', label: '小红书 (1080x1920)', width: 1080, height: 1920 },
+    { value: 'bilibili', label: 'B站竖屏 (1080x1920)', width: 1080, height: 1920 },
+    { value: 'youtubeshorts', label: 'YouTube Shorts (1080x1920)', width: 1080, height: 1920 },
+    { value: 'tiktok', label: 'TikTok (1080x1920)', width: 1080, height: 1920 },
+    { value: 'instagramreels', label: 'Instagram Reels (1080x1920)', width: 1080, height: 1920 },
+    { value: 'customportrait', label: '自定义竖向 (1080x1920)', width: 1080, height: 1920 }
+];
+
+// 计算当前视频分辨率选项
+const currentVideoResolutions = computed(() => {
+    return videoSettings.value.orientation === 'landscape' 
+        ? LANDSCAPE_VIDEO_RESOLUTIONS 
+        : PORTRAIT_VIDEO_RESOLUTIONS;
 });
 
 // 导出进度
@@ -429,18 +485,18 @@ const setupEventListeners = () => {
 
     // 监听视频设置获取事件
     eventBus.on('get-video-settings', (resolve) => {
-        const resolutionMap = {
-            '720p': { width: 1280, height: 720 },
-            '1080p': { width: 1920, height: 1080 },
-            '2K': { width: 2560, height: 1440 },
-            '4K': { width: 3840, height: 2160 }
-        };
+        // 根据当前选择的分辨率获取对应的宽度和高度
+        const currentResolution = currentVideoResolutions.value.find(
+            res => res.value === videoSettings.value.resolution
+        ) || currentVideoResolutions.value[0];
         
         const settings = {
-            ...resolutionMap[videoSettings.value.resolution],
+            width: currentResolution.width,
+            height: currentResolution.height,
             duration: videoSettings.value.duration,
             fps: videoSettings.value.fps,
-            rotations: videoSettings.value.rotations
+            rotations: videoSettings.value.rotations,
+            orientation: videoSettings.value.orientation
         };
         
         resolve(settings);
@@ -457,6 +513,11 @@ const setupEventListeners = () => {
 };
 
 // 视频导出相关方法
+const handleVideoOrientationChange = () => {
+    // 当切换方向时，重置分辨率选择为第一个选项
+    videoSettings.value.resolution = currentVideoResolutions.value[0].value;
+};
+
 const startVideoExport = () => {
     eventBus.emit('start-video-export');
 };
