@@ -1,0 +1,43 @@
+{
+  "name": "vite-plugin-panoviewer-singlefile",
+  "version": "1.0.0",
+  "description": "Vite插件：全景查看器单文件打包，将全景查看器应用打包成完全自包含的单个HTML文件",
+  "main": "vite-plugin-panoviewer-singlefile.js",
+  "type": "module",
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "singlefile",
+    "panorama",
+    "pannellum",
+    "inline",
+    "bundle"
+  ],
+  "author": "全景查看器项目",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/cc-panoviewer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/cc-panoviewer/issues"
+  },
+  "homepage": "https://github.com/your-username/cc-panoviewer#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "peerDependencies": {
+    "vite": "^5.0.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "files": [
+    "vite-plugin-panoviewer-singlefile.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+} 

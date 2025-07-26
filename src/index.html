@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html style="height: 100%;">
+
+<head>
+    <meta charset="utf-8">
+    <title>全景图浏览器</title>
+    <link rel="stylesheet" href="./styles/main.css">
+    <link rel="stylesheet" href="../pannellum.css">
+    <script src="../pannellum.js"></script>
+</head>
+
+<body>
+    <div id="panorama" style="width: 100%; height: 100%;"></div>
+    
+    <div id="uploadPrompt" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; background: rgba(255, 255, 255, 0.9); padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+        <h2>全景图浏览器</h2>
+        <p>拖拽全景图文件到此处，或点击选择文件</p>
+        <input type="file" id="fileInput" accept="image/*,.html" style="display: none;">
+        <button onclick="document.getElementById('fileInput').click()" style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">选择文件</button>
+    </div>
+    
+    <div id="contextMenu">
+        <ul>
+            <li onclick="downloadPage()">下载当前页面</li>
+        </ul>
+    </div>
+    
+    <div id="files">
+        <img src="" id="image1" class="imageFileContent">
+    </div>
+    
+    <div id="dataBase">
+        <script class="images" data-id="image1">
+            // 这里将填充base64数据
+        </script>
+    </div>
+    
+    <div id="cc-right" contenteditable="true">
+        这是一个"自包含"的全景图查看器,简单封装了<a href="https://pannellum.org/">pannellum</a>的接口,你可以使用它自由地查看你的各种全景图,
+        右键可以下载包含你的全景图的网页内容（可能有点大，这个网页不会压缩你的全景图），你的图片只会存在网页本身中不会被上传到任何地方
+        代码本身遵循AGPL-3.0-or-later协议,你可以随意再次分发并修改它,只需要保持修改之后的结果仍然遵守同样的协议即可,这段代码脚注本身也是可以编辑的,
+        你可以改成你自己喜欢的内容。
+    </div>
+    
+    <div id="cc-bottom" contenteditable="false">
+        如果你喜欢这个小工具可以去<a href="https://ifdian.net/a/leolee9086">我们的爱发电</a> 请我们喝一杯咖啡
+        感谢pannellum的作者,推荐使用<a href="https://b3log.org/siyuan/">思源笔记</a>，这个网页本身就是使用思源支持后台服务的。
+    </div>
+    
+    <div id="previewContainer">
+        <button id="uploader">添加图片</button>
+    </div>
+    
+    <script type="module" src="./scripts/main.js"></script>
+</body>
+
+</html> 

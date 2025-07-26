@@ -1,0 +1,139 @@
+html,
+body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+#panorama {
+    width: 100%;
+    height: 100%;
+}
+
+#uploadPrompt {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    padding: 20px;
+    background: white;
+    border: 1px solid #ccc;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    z-index: 1000;
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    color: #333;
+    text-align: center;
+}
+
+#cc-bottom {
+    position: fixed;
+    left: 50%;
+    top: 90%;
+    transform: translate(-50%, -50%);
+    padding: 20px;
+    background: transparent;
+    border: 1px solid #ccc;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    z-index: 1000;
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    color: #333;
+    text-align: center;
+}
+
+#cc-right {
+    position: fixed;
+    left: 100%;
+    top: 20px;
+    transform: translate(-100%, 0%);
+    padding: 20px;
+    background: rgba(240, 240, 240, 0.705) !important;
+    border: 1px solid #3d3d3db4;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    z-index: 1000;
+    font-family: Arial, sans-serif;
+    color: #333;
+    min-width: 20vw;
+    max-width: 20vw;
+    max-height: 80vh;
+}
+
+#contextMenu {
+    display: none;
+    position: fixed;
+    z-index: 1001;
+    background: white;
+    border: 1px solid black;
+    padding: 5px;
+    border-radius: 5px;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+#contextMenu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+#contextMenu ul li {
+    padding: 8px;
+    cursor: pointer;
+}
+
+#contextMenu ul li:hover {
+    background-color: #f0f0f0;
+}
+
+#files {
+    display: none;
+}
+
+#previewContainer {
+    margin-top: 10vh;
+    position: fixed;
+    margin: 2vw;
+    left: 3vw;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 90vh;
+    z-index: 100;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 自定义滚动条样式 */
+#previewContainer::-webkit-scrollbar {
+    width: 8px;
+}
+
+#previewContainer::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#previewContainer::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.5);
+    border-radius: 4px;
+}
+
+#previewContainer::-webkit-scrollbar-button {
+    display: none;
+}
+
+#previewContainer * {
+    padding-top: 5px;
+}
+
+#previewContainer img,
+#previewContainer image {
+    width: 15vw
+}
+
+#previewContainer button {
+    width: 15vw;
+    height: 5vw
+} 
