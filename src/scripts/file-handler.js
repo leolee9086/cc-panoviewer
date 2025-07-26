@@ -124,7 +124,7 @@ function handleImageFile(file) {
         
         // 更新预览区显示缩略图
         document.getElementById('previewContainer').innerHTML = `
-            <img id="previewImage" src="${thumbnailData}" alt="Preview" style="max-width: 200px; max-height: 100px; cursor: pointer;">
+            <img id="previewImage" src="${thumbnailData}" alt="Preview">
             <button id="uploader">添加图片</button>
         `;
         
@@ -199,7 +199,7 @@ async function handleHTMLFile(file) {
             
             // 更新预览区显示缩略图
             document.getElementById('previewContainer').innerHTML = `
-                <img id="previewImage" src="${thumbnailData}" alt="Preview" style="max-width: 200px; max-height: 100px; cursor: pointer;">
+                <img id="previewImage" src="${thumbnailData}" alt="Preview">
                 <button id="uploader">添加图片</button>
             `;
             

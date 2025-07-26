@@ -3,6 +3,7 @@ import { handleFileUpload } from './file-handler.js';
 import { downloadPage } from './download-utils.js';
 import { storage } from './storage.js';
 import { PanoramaVideoGenerator, saveVideoBlob } from './panorama-exporter.js';
+import { DocumentDB } from './document-db.js';
 
 // 常用分辨率选项（仅用于导出压缩版页面）
 const COMMON_RESOLUTIONS = [
@@ -229,10 +230,24 @@ async function exportCompressedPage(resolution) {
     // 创建临时克隆版document
     const tempDocument = document.cloneNode(true);
     
+    // 在临时document中创建新的DocumentDB实例
+    const tempDb = new DocumentDB(tempDocument);
+    
+    // 直接用压缩后的图片数据替换原来的图片数据
+    tempDb.set(`image.${currentImageId}`, compressed, { type: 'base64' });
+    
+    // 清理其他不需要的数据，只保留压缩图片
+    const allKeys = tempDb.list();
+    allKeys.forEach(key => {
+        if (!key.startsWith('image.') && key !== 'currentImage') {
+            tempDb.delete(key);
+        }
+    });
+    
     // 在临时document中查找并更新script标签
     const tempScriptElement = tempDocument.querySelector('.images');
     if (tempScriptElement) {
-        // 使用DOM操作安全地写入base64数据
+        // 使用DOM操作安全地写入压缩后的base64数据
         tempScriptElement.textContent = 'window.imageData = "' + compressed + '";';
     }
     
