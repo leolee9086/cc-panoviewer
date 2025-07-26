@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocumentDB 自动化测试</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #7f8c8d;
+            font-size: 16px;
+        }
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        .btn-success {
+            background-color: #27ae60;
+        }
+        .btn-success:hover {
+            background-color: #229954;
+        }
+        .btn-danger {
+            background-color: #e74c3c;
+        }
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        .test-results {
+            margin: 20px 0;
+        }
+        .test-log {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .test-summary {
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #bdc3c7;
+        }
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+        .summary-label {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .summary-value {
+            color: #7f8c8d;
+        }
+        .database-content {
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+        .database-html {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.success {
+            background-color: #d5f4e6;
+            color: #27ae60;
+            border: 1px solid #27ae60;
+        }
+        .status.error {
+            background-color: #fadbd8;
+            color: #e74c3c;
+            border: 1px solid #e74c3c;
+        }
+        .status.info {
+            background-color: #d6eaf8;
+            color: #3498db;
+            border: 1px solid #3498db;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 DocumentDB 自动化测试</h1>
+            <p>测试DocumentDB模块的核心功能，包括数据存储、检索、导出导入等</p>
+        </div>
+
+        <div class="test-controls">
+            <button class="btn btn-success" id="runTests">运行所有测试</button>
+            <button class="btn btn-danger" id="clearResults">清空结果</button>
+            <button class="btn" id="showDatabase">显示数据库</button>
+            <button class="btn" id="exportResults">导出结果</button>
+        </div>
+
+        <div class="test-results">
+            <div id="test-log" class="test-log">等待运行测试...</div>
+        </div>
+
+        <div id="test-summary" class="test-summary">
+            <h3>📊 测试摘要</h3>
+            <div id="summary-content"></div>
+        </div>
+
+        <div id="database-content" class="database-content">
+            <h3>🗄️ 数据库内容</h3>
+            <div id="database-html" class="database-html"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { runDocumentDBTests } from './scripts/document-db.test.js';
+        import { DocumentDB } from '../src/scripts/document-db.js';
+        
+        // 将DocumentDB暴露到全局作用域，供测试使用
+        window.DocumentDB = DocumentDB;
+
+        let testResults = null;
+        let testDatabase = null;
+        let testDatabaseHtml = null;
+
+        // 获取DOM元素
+        const runTestsBtn = document.getElementById('runTests');
+        const clearResultsBtn = document.getElementById('clearResults');
+        const showDatabaseBtn = document.getElementById('showDatabase');
+        const exportResultsBtn = document.getElementById('exportResults');
+        const testLog = document.getElementById('test-log');
+        const testSummary = document.getElementById('test-summary');
+        const summaryContent = document.getElementById('summary-content');
+        const databaseContent = document.getElementById('database-content');
+        const databaseHtml = document.getElementById('database-html');
+
+        // 更新测试日志
+        function updateLog(message) {
+            testLog.textContent += message + '\n';
+            testLog.scrollTop = testLog.scrollHeight;
+        }
+
+        // 暴露给测试脚本使用
+        window.testLog = updateLog;
+
+        // 清空结果
+        function clearResults() {
+            testLog.textContent = '等待运行测试...';
+            testSummary.style.display = 'none';
+            databaseContent.style.display = 'none';
+            testResults = null;
+            testDatabase = null;
+            testDatabaseHtml = null;
+        }
+
+        // 显示测试摘要
+        function showSummary(results) {
+            const summary = results.summary;
+            summaryContent.innerHTML = `
+                <div class="summary-item">
+                    <span class="summary-label">测试状态:</span>
+                    <span class="summary-value">${summary.totalTests} 个测试，${summary.passedTests} 个通过，${summary.failedTests} 个失败</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">执行时间:</span>
+                    <span class="summary-value">${summary.duration}ms</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">成功率:</span>
+                    <span class="summary-value">${summary.successRate}%</span>
+                </div>
+            `;
+            testSummary.style.display = 'block';
+        }
+
+        // 显示数据库内容
+        function showDatabase() {
+            if (testDatabaseHtml) {
+                databaseHtml.textContent = testDatabaseHtml;
+                databaseContent.style.display = 'block';
+            } else if (testDatabase) {
+                databaseHtml.textContent = testDatabase.outerHTML;
+                databaseContent.style.display = 'block';
+            } else {
+                databaseHtml.textContent = '数据库未初始化或为空';
+                databaseContent.style.display = 'block';
+            }
+        }
+
+        // 导出测试结果
+        function exportResults() {
+            if (testResults) {
+                const dataStr = JSON.stringify(testResults, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `document-db-test-results-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+                link.click();
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        // 运行测试
+        async function runTests() {
+            testLog.textContent = '正在运行测试...\n';
+            
+            try {
+                const results = await runDocumentDBTests();
+                testResults = results;
+                
+                if (results.database) {
+                    testDatabase = results.database;
+                    testDatabaseHtml = results.databaseHtml;
+                    updateLog('数据库已初始化');
+                } else {
+                    updateLog('警告: 数据库未初始化');
+                }
+                
+                updateLog('\n🎉 所有测试通过！');
+                showSummary(results);
+                
+            } catch (error) {
+                updateLog(`\n💥 测试失败: ${error.message}`);
+                console.error('测试错误:', error);
+            }
+        }
+
+        // 事件监听器
+        runTestsBtn.addEventListener('click', runTests);
+        clearResultsBtn.addEventListener('click', clearResults);
+        showDatabaseBtn.addEventListener('click', showDatabase);
+        exportResultsBtn.addEventListener('click', exportResults);
+    </script>
+</body>
+</html> 

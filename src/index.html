@@ -6,7 +6,7 @@
     <title>全景图浏览器</title>
     <link rel="stylesheet" href="./styles/main.css">
     <link rel="stylesheet" href="../pannellum.css">
-    <script src="../pannellum.js"></script>
+    <script type="module" src="../pannellum.js"></script>
 </head>
 
 <body>
@@ -21,7 +21,8 @@
     
     <div id="contextMenu">
         <ul>
-            <li onclick="downloadPage()">下载当前页面</li>
+            <li data-action="download-page">下载当前页面</li>
+            <li data-action="export-compressed">导出压缩版页面</li>
         </ul>
     </div>
     
@@ -38,7 +39,7 @@
     <div id="cc-right" contenteditable="true">
         这是一个"自包含"的全景图查看器,简单封装了<a href="https://pannellum.org/">pannellum</a>的接口,你可以使用它自由地查看你的各种全景图,
         右键可以下载包含你的全景图的网页内容（可能有点大，这个网页不会压缩你的全景图），你的图片只会存在网页本身中不会被上传到任何地方
-        代码本身遵循AGPL-3.0-or-later协议,你可以随意再次分发并修改它,只需要保持修改之后的结果仍然遵守同样的协议即可,这段代码脚注本身也是可以编辑的,
+        代码本身遵循AGPL-3.0-or-later协议,你可以随意再次分发并修改它,只需要保持修改之后的结果仍然遵守同样的协议即可,这段代码脚本注本身也是可以编辑的,
         你可以改成你自己喜欢的内容。
     </div>
     

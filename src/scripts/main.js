@@ -2,7 +2,6 @@ import { initPannellum } from './pannellum-loader.js';
 import { setupEventListeners } from './event-handlers.js';
 import { createViewer } from './viewer-manager.js';
 import { handleFileUpload } from './file-handler.js';
-import { initGlobalFunctions } from './global-exports.js';
 
 /**
  * 应用主入口
@@ -19,9 +18,6 @@ function initApp() {
     
     // 设置事件监听器
     setupEventListeners();
-    
-    // 初始化全局函数
-    initGlobalFunctions();
     
     // 页面加载完成后的初始化
     window.onload = () => {

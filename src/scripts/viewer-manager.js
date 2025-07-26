@@ -1,5 +1,3 @@
-import { addCustomContextMenuItem } from './context-menu.js';
-
 /**
  * 创建Pannellum查看器
  * @param {string} containerId - 容器ID
@@ -15,11 +13,6 @@ export function createViewer(containerId, config) {
     }
     
     const viewer = pannellum.viewer(containerId, config);
-    
-    // 添加自定义右键菜单项
-    viewer.on('load', function () {
-        addCustomContextMenuItem(viewer);
-    });
     
     return viewer;
 }
