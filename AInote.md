@@ -10,64 +10,42 @@
 
 ## 修改记录
 
-### 2025-07-27 01:43 - 修复添加图片按钮功能
+### 2025-07-27 02:22 - 修复页面导出逻辑：确保使用干净克隆
 
-#### 主要修改
-1. **修复Vue组件中的按钮事件** (`src/App.vue`)
-   - 将`previewContainer`的HTML操作改为Vue响应式数据
-   - 添加`currentThumbnail`数据属性来管理缩略图显示
-   - 添加`handleUploaderClick()`方法直接处理文件选择
-   - 添加`loadCurrentPanorama()`方法处理缩略图点击
+#### 问题发现
+用户指出页面导出后还残留了打开的菜单，说明导出逻辑存在问题。
 
-2. **更新模板结构**
-   - 使用Vue指令`v-if`和`:src`来动态显示缩略图
-   - 使用`@click`事件绑定来处理按钮点击
-   - 移除对DOM的直接操作，改用Vue的响应式系统
+#### 根本原因
+1. `downloadPage()`函数直接使用当前document，导致导出的页面包含用户操作状态（如打开的菜单）
+2. 所有使用cleanDocumentClone的地方都有回退逻辑（`|| document`），这会隐藏初始化问题
 
-3. **简化事件处理器** (`src/scripts/event-handlers.js`)
-   - 移除`setupPreviewContainer`中的点击事件处理
-   - 保留右键菜单功能用于删除缩略图
-   - 将文件选择逻辑移到Vue组件中
+#### 修复方案
+1. **移除回退逻辑**：所有使用cleanDocumentClone的地方都不应该有回退逻辑
+2. **添加错误检查**：如果cleanDocumentClone未初始化，直接抛出错误
+3. **使用静态导入**：移除不必要的动态导入，直接使用静态导入DocumentDB
 
-#### 技术要点
-- **Vue响应式**: 使用Vue的响应式数据管理缩略图显示
-- **事件处理**: 直接在Vue组件中处理按钮点击，避免DOM操作冲突
-- **文件处理**: 使用动态导入确保文件处理模块正确加载
+#### 具体修改
+1. **download-utils.js**：
+   - 添加静态导入：`import { DocumentDB } from './document-db.js'`
+   - 移除async/await，使用同步函数
+   - 在`downloadPage()`和`downloadEmptyPage()`中添加cleanDocumentClone检查
+   - 移除所有`|| document`回退逻辑
+   - **重要修复**：`downloadEmptyPage()`直接使用干净克隆，不进行任何数据复制
 
-#### 解决的问题
-- 添加图片按钮点击后没有反应
-- 缩略图显示和点击功能异常
-- DOM操作与Vue响应式系统冲突
-
-### 2025-07-27 01:36 - 修复导出逻辑：移除UI状态残留问题
-
-#### 主要修改
-1. **修复导出逻辑** (`src/scripts/download-utils.js`, `src/scripts/event-handlers.js`)
-   - 添加`cleanupUIElements()`函数，移除所有可能影响导出的UI状态
-   - 移除右键菜单、视频导出对话框、导出进度显示、上传提示组件等UI元素
-   - 清理Vue相关的data属性和显示状态样式
-   - 移除回退逻辑，如果`cleanDocumentClone`不存在直接报错
-
-2. **UI清理机制**
-   - **右键菜单**: 移除`contextMenu`元素
-   - **对话框**: 移除`videoExportDialog`和`exportProgress`元素
-   - **Vue属性**: 清理所有`data-v-`开头的Vue内部属性
-   - **样式清理**: 移除包含`display: none`或`visibility: hidden`的样式元素
-
-3. **错误处理优化**
-   - 移除所有回退逻辑，确保导出时必须有干净的document克隆
-   - 如果`cleanDocumentClone`不存在，直接抛出错误而不是回退到当前document
-   - 确保导出的页面不包含任何UI状态残留
+2. **event-handlers.js**：
+   - 修复`exportCompressedPage()`函数，添加cleanDocumentClone检查
+   - 移除回退逻辑
 
 #### 技术要点
-- **UI状态清理**: 导出前彻底清理所有UI元素，确保导出的页面纯净
-- **错误处理**: 移除回退逻辑，确保问题能够及时发现和修复
-- **数据完整性**: 保持数据注入逻辑不变，确保导出的页面包含正确的数据
+- **干净模板**：确保所有导出都使用干净的document克隆作为基础
+- **数据复制**：在干净的模板上复制当前DB数据，而不是直接使用当前document
+- **错误处理**：如果cleanDocumentClone未初始化，直接抛出错误而不是隐藏问题
 
 #### 解决的问题
-- 导出页面包含打开的菜单、对话框等UI状态残留
-- 确保导出的页面是干净的，不包含任何临时UI状态
-- 如果初始化有问题，能够及时发现而不是隐藏错误
+- 导出的页面不再包含用户操作状态（如打开的菜单）
+- 确保导出逻辑的一致性和可靠性
+- 通过错误检查及早发现初始化问题
+- **空页面导出**：确保`downloadEmptyPage()`真正导出干净的模板，不包含任何数据
 
 ### 2025-07-26 23:40 - 改进下载功能：区分有数据和无数据页面
 
