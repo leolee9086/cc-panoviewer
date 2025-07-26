@@ -1,3 +1,5 @@
+import { storage } from './storage.js';
+
 /**
  * 下载工具函数
  * 提供页面下载相关的功能
@@ -18,6 +20,16 @@ export function downloadPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    // 记录下载历史
+    const downloadHistory = storage.getConfig('download.history', []);
+    downloadHistory.push({
+        fileName: 'downloaded_page.html',
+        fileSize: blob.size,
+        downloadTime: Date.now(),
+        type: 'page'
+    });
+    storage.setConfig('download.history', downloadHistory);
 }
 
 /**

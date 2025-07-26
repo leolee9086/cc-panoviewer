@@ -1,3 +1,5 @@
+import { storage } from './storage.js';
+
 /**
  * 创建Pannellum查看器
  * @param {string} containerId - 容器ID
@@ -12,7 +14,17 @@ export function createViewer(containerId, config) {
         return null;
     }
     
+    // 保存查看器配置
+    storage.setViewer('config', config);
+    
     const viewer = pannellum.viewer(containerId, config);
+    
+    // 保存查看器状态
+    storage.setViewer('state', {
+        containerId,
+        createdAt: Date.now(),
+        config: config
+    });
     
     return viewer;
 }
@@ -25,5 +37,13 @@ export function createViewer(containerId, config) {
 export function addHotSpot(viewer, hotspotConfig) {
     if (viewer && viewer.addHotSpot) {
         viewer.addHotSpot(hotspotConfig);
+        
+        // 保存热点数据
+        const hotspots = storage.getViewer('hotspots', []);
+        hotspots.push({
+            ...hotspotConfig,
+            addedAt: Date.now()
+        });
+        storage.setViewer('hotspots', hotspots);
     }
 } 

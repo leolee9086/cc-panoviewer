@@ -1,6 +1,7 @@
 import { createViewer } from './viewer-manager.js';
 import { handleFileUpload } from './file-handler.js';
 import { downloadPage } from './download-utils.js';
+import { storage } from './storage.js';
 
 // 常用分辨率选项
 const COMMON_RESOLUTIONS = [
@@ -29,13 +30,19 @@ function compressImage(src, width, height) {
 
 // 弹窗选择分辨率
 function showResolutionDialog(onSelect) {
+    // 获取保存的分辨率设置
+    const savedResolutionIndex = storage.getConfig('export.resolution.index', 1); // 默认2K
+    
     const dialog = document.createElement('div');
     dialog.style = 'position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:24px 32px;z-index:9999;border-radius:8px;box-shadow:0 2px 12px #0002;';
-    dialog.innerHTML = `<div style="margin-bottom:12px;">选择导出分辨率：</div><select id="exportResolution">${COMMON_RESOLUTIONS.map((r,i)=>`<option value="${i}">${r.label}</option>`).join('')}</select><br><br><button id="exportConfirm">确定</button> <button id="exportCancel">取消</button>`;
+    dialog.innerHTML = `<div style="margin-bottom:12px;">选择导出分辨率：</div><select id="exportResolution">${COMMON_RESOLUTIONS.map((r,i)=>`<option value="${i}" ${i === savedResolutionIndex ? 'selected' : ''}>${r.label}</option>`).join('')}</select><br><br><button id="exportConfirm">确定</button> <button id="exportCancel">取消</button>`;
     document.body.appendChild(dialog);
     dialog.querySelector('#exportConfirm').onclick = () => {
-        const idx = dialog.querySelector('#exportResolution').value;
+        const idx = parseInt(dialog.querySelector('#exportResolution').value);
         document.body.removeChild(dialog);
+        // 保存用户选择
+        storage.setConfig('export.resolution.index', idx);
+        storage.setConfig('export.resolution', COMMON_RESOLUTIONS[idx].label);
         onSelect(COMMON_RESOLUTIONS[idx]);
     };
     dialog.querySelector('#exportCancel').onclick = () => {
@@ -45,29 +52,38 @@ function showResolutionDialog(onSelect) {
 
 // 导出压缩版页面
 async function exportCompressedPage(resolution) {
-    // 获取图片数据 - 检查多个可能的存储位置
-    let src = null;
+    // 获取图片数据 - 优先从存储中获取
+    let src = storage.getImage('current');
     
-    // 1. 检查window.imageData
-    if (window.imageData) {
-        src = window.imageData;
-    }
-    // 2. 检查HTML中script标签的图片数据
-    else {
-        const scriptElement = document.querySelector('.images');
-        if (scriptElement && scriptElement.textContent.includes('window.imageData = ')) {
-            try {
-                // 尝试解析转义字符格式的base64数据
-                const match = scriptElement.textContent.match(/window\.imageData = "([^"]+)"/);
-                if (match) {
-                    src = match[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\').replace(/\\n/g, '\n').replace(/\\r/g, '\r');
-                }
-            } catch (e) {
-                // 如果解析失败，尝试旧的格式
-                if (scriptElement.textContent.includes('window.imageData = "')) {
+    // 如果没有存储数据，检查其他位置
+    if (!src) {
+        // 1. 检查window.imageData
+        if (window.imageData) {
+            src = window.imageData;
+            // 迁移到存储中
+            storage.setImage('current', src);
+        }
+        // 2. 检查HTML中script标签的图片数据
+        else {
+            const scriptElement = document.querySelector('.images');
+            if (scriptElement && scriptElement.textContent.includes('window.imageData = ')) {
+                try {
+                    // 尝试解析转义字符格式的base64数据
                     const match = scriptElement.textContent.match(/window\.imageData = "([^"]+)"/);
                     if (match) {
-                        src = match[1];
+                        src = match[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\').replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+                        // 迁移到存储中
+                        storage.setImage('current', src);
+                    }
+                } catch (e) {
+                    // 如果解析失败，尝试旧的格式
+                    if (scriptElement.textContent.includes('window.imageData = "')) {
+                        const match = scriptElement.textContent.match(/window\.imageData = "([^"]+)"/);
+                        if (match) {
+                            src = match[1];
+                            // 迁移到存储中
+                            storage.setImage('current', src);
+                        }
                     }
                 }
             }
@@ -79,12 +95,21 @@ async function exportCompressedPage(resolution) {
         return;
     }
     
+    // 记录导出操作历史
+    storage.addHistory('export_compressed', {
+        resolution: resolution,
+        timestamp: Date.now()
+    });
+    
     // 先解码原图尺寸
     const img = new Image();
     img.src = src;
     await new Promise(r=>img.onload=r);
     const targetW = resolution.width, targetH = resolution.height;
     const compressed = await compressImage(src, targetW, targetH);
+    
+    // 保存压缩版本到缓存
+    storage.setImage('compressed', compressed);
     
     // 创建临时克隆版document
     const tempDocument = document.cloneNode(true);

@@ -1,4 +1,5 @@
 import { createViewer } from './viewer-manager.js';
+import { storage } from './storage.js';
 
 /**
  * 常用分辨率选项
@@ -61,6 +62,27 @@ function handleImageFile(file) {
     const reader = new FileReader();
     reader.onload = async function (e) {
         const base64data = e.target.result;
+        
+        // 保存文件元数据
+        const metadata = {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            uploadTime: Date.now()
+        };
+        
+        // 使用事务保存文件数据
+        storage.withTransaction(async () => {
+            // 保存文件元数据
+            const history = storage.getFile('uploadHistory', []);
+            history.push(metadata);
+            storage.setFile('uploadHistory', history);
+            storage.setFile('current', metadata);
+            
+            // 保存原始图片数据
+            storage.setImage('original', base64data);
+        });
+        
         // 生成多分辨率压缩图
         const compressedList = await Promise.all(
             COMMON_RESOLUTIONS.map(async (item) => ({
@@ -68,6 +90,10 @@ function handleImageFile(file) {
                 base64: item.width ? await compressImage(base64data, item.width, item.height) : base64data
             }))
         );
+        
+        // 保存压缩版本到缓存
+        storage.setFile('compressedCache', compressedList);
+        
         // 预览区提供分辨率选择
         let selectHtml = '<select id="resolutionSelect">';
         compressedList.forEach((item, idx) => {
@@ -78,14 +104,15 @@ function handleImageFile(file) {
             <div style="margin-bottom:8px;">选择分辨率：${selectHtml}</div>
             <img id="previewImage" src="${compressedList[0].base64}" alt="Preview">
         ` + document.getElementById('previewContainer').innerHTML;
+        
         // 选择分辨率时切换预览
         document.getElementById('resolutionSelect').addEventListener('change', function () {
             const idx = this.value;
             document.getElementById('previewImage').src = compressedList[idx].base64;
-            // 保存图片数据 - 使用DOM操作安全处理
-            const scriptElement = document.querySelector('.images');
-            scriptElement.textContent = 'window.imageData = "' + compressedList[idx].base64 + '";';
+            // 保存当前选择的图片数据
+            storage.setImage('current', compressedList[idx].base64);
         });
+        
         // 创建查看器
         const viewer = createViewer('panorama', {
             "type": "equirectangular",
@@ -95,9 +122,16 @@ function handleImageFile(file) {
             "autoRotate": true,
             "hotSpots": []
         });
-        // 默认保存原图数据 - 使用DOM操作安全处理
-        const scriptElement = document.querySelector('.images');
-        scriptElement.textContent = 'window.imageData = "' + compressedList[0].base64 + '";';
+        
+        // 保存当前图片数据
+        storage.setImage('current', compressedList[0].base64);
+        
+        // 记录操作历史
+        storage.addHistory('file_upload', {
+            fileName: file.name,
+            fileSize: file.size,
+            resolution: 'original'
+        });
         document.getElementById('uploadPrompt').style.display = 'none';
     };
     reader.readAsDataURL(file);
