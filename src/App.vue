@@ -11,65 +11,89 @@
             @cancel="handleResolutionCancel" 
         />
         
-        <div id="contextMenu">
+        <!-- 右键菜单 - 改为Vue组件 -->
+        <div v-if="showContextMenu" 
+             :style="{ top: contextMenuPosition.y + 'px', left: contextMenuPosition.x + 'px' }"
+             class="context-menu">
             <ul>
-                <li data-action="download-page">下载当前页面（含数据）</li>
-                <li data-action="download-empty-page">下载空页面（无数据）</li>
-                <li data-action="export-compressed">导出压缩版页面</li>
-                <li data-action="export-video">导出视频</li>
+                <li @click="handleContextMenuAction('download-page')">下载当前页面（含数据）</li>
+                <li @click="handleContextMenuAction('download-empty-page')">下载空页面（无数据）</li>
+                <li @click="handleContextMenuAction('export-compressed')">导出压缩版页面</li>
+                <li @click="handleContextMenuAction('export-video')">导出视频</li>
             </ul>
         </div>
         
-        <!-- 视频导出对话框 -->
-        <div id="videoExportDialog" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; min-width: 400px;">
+        <!-- 视频导出对话框 - 改为Vue组件 -->
+        <div v-if="showVideoExportDialog" class="video-export-dialog">
+            <div class="dialog-content">
                 <h3>导出全景视频</h3>
-                <div style="margin: 20px 0;">
+                <div class="form-group">
                     <label>分辨率:</label>
-                    <select id="videoResolution">
+                    <select v-model="videoSettings.resolution">
                         <option value="720p">720p (1280x720)</option>
-                        <option value="1080p" selected>1080p (1920x1080)</option>
+                        <option value="1080p">1080p (1920x1080)</option>
                         <option value="2K">2K (2560x1440)</option>
                         <option value="4K">4K (3840x2160)</option>
                     </select>
                 </div>
-                <div style="margin: 20px 0;">
+                <div class="form-group">
                     <label>时长 (秒):</label>
-                    <input type="number" id="videoDuration" value="10" min="1" max="60" style="width: 80px;">
+                    <input type="number" v-model="videoSettings.duration" min="1" max="60">
                 </div>
-                <div style="margin: 20px 0;">
+                <div class="form-group">
                     <label>帧率 (FPS):</label>
-                    <select id="videoFps">
+                    <select v-model="videoSettings.fps">
                         <option value="24">24 FPS</option>
-                        <option value="30" selected>30 FPS</option>
+                        <option value="30">30 FPS</option>
                         <option value="60">60 FPS</option>
                     </select>
                 </div>
-                <div style="margin: 20px 0;">
+                <div class="form-group">
                     <label>旋转圈数:</label>
-                    <input type="number" id="videoRotations" value="1" min="0.1" max="5" step="0.1" style="width: 80px;">
+                    <input type="number" v-model="videoSettings.rotations" min="0.1" max="5" step="0.1">
                 </div>
-                <div style="margin: 20px 0;">
-                    <button id="startVideoExport" style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-right: 10px;">开始导出</button>
-                    <button id="cancelVideoExport" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">取消</button>
+                <div class="form-group">
+                    <button @click="startVideoExport" class="btn-primary">开始导出</button>
+                    <button @click="cancelVideoExport" class="btn-secondary">取消</button>
                 </div>
             </div>
         </div>
         
-        <!-- 导出进度显示 -->
-        <div id="exportProgress" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1001;">
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; min-width: 400px; text-align: center;">
+        <!-- 导出进度显示 - 改为Vue组件 -->
+        <div v-if="showExportProgress" class="export-progress">
+            <div class="progress-content">
                 <h3>正在导出视频...</h3>
-                <div style="margin: 20px 0;">
-                    <div style="width: 100%; height: 20px; background: #f0f0f0; border-radius: 10px; overflow: hidden;">
-                        <div id="progressBar" style="width: 0%; height: 100%; background: #007bff; transition: width 0.3s;"></div>
-                    </div>
-                    <div id="progressText" style="margin-top: 10px;">准备中...</div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" :style="{ width: exportProgress.percent + '%' }"></div>
                 </div>
-                <div id="previewFrame" style="margin: 20px 0; max-width: 320px; max-height: 180px;">
-                    <!-- 预览帧将在这里显示 -->
+                <div class="progress-text">{{ exportProgress.text }}</div>
+                <div v-if="exportProgress.frameImage" class="preview-frame">
+                    <img :src="exportProgress.frameImage" alt="预览帧">
                 </div>
             </div>
+        </div>
+        
+        <!-- 压缩进度对话框 - 改为Vue组件 -->
+        <div v-if="showCompressionProgress" class="compression-progress">
+            <div class="compression-content">
+                <h3>正在压缩页面...</h3>
+                <div class="progress-bar-container">
+                    <div class="compression-progress-bar" :style="{ width: compressionProgress.percentage + '%' }"></div>
+                </div>
+                <div class="compression-progress-text">{{ compressionProgress.text }}</div>
+                <div class="compression-info">
+                    <div>压缩过程包括：</div>
+                    <div>1. 图片压缩处理</div>
+                    <div>2. 页面模板准备</div>
+                    <div>3. 数据整合</div>
+                    <div>4. 文件生成下载</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 消息提示 - 改为Vue组件 -->
+        <div v-if="showMessage" class="message-toast" :class="messageType">
+            {{ messageText }}
         </div>
         
         <div id="files">
@@ -94,16 +118,24 @@
             感谢pannellum的作者,推荐使用<a href="https://b3log.org/siyuan/">思源笔记</a>，这个网页本身就是使用思源支持后台服务的。
         </div>
         
-
-        
-        <div id="previewContainer">
-            <button id="uploader">添加图片</button>
+        <!-- 预览容器 - 改为Vue响应式 -->
+        <div id="previewContainer" class="preview-container">
+            <div class="thumbnails-container">
+                <img v-for="thumbnail in thumbnails" 
+                     :key="thumbnail.id"
+                     :src="thumbnail.src" 
+                     :alt="thumbnail.alt"
+                     :class="{ active: thumbnail.id === currentImageId }"
+                     @click="switchToImage(thumbnail.id)"
+                     class="thumbnail">
+            </div>
+            <button @click="triggerFileInput" class="upload-button">添加图片</button>
         </div>
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, nextTick } from 'vue';
 import UploadPrompt from './components/UploadPrompt.vue';
 import ResolutionDialog from './components/ResolutionDialog.vue';
 import { initApp, eventBus } from './scripts/main.js';
@@ -117,6 +149,40 @@ const imageList = ref([]);
 const currentImageId = ref(null);
 const showResolutionDialog = ref(false);
 const pendingResolutionCallback = ref(null);
+
+// 新增的响应式数据
+const showContextMenu = ref(false);
+const contextMenuPosition = ref({ x: 0, y: 0 });
+const showVideoExportDialog = ref(false);
+const showExportProgress = ref(false);
+const showCompressionProgress = ref(false);
+const showMessage = ref(false);
+const messageText = ref('');
+const messageType = ref('info');
+
+// 视频设置
+const videoSettings = ref({
+    resolution: '1080p',
+    duration: 10,
+    fps: 30,
+    rotations: 1
+});
+
+// 导出进度
+const exportProgress = ref({
+    percent: 0,
+    text: '准备中...',
+    frameImage: null
+});
+
+// 压缩进度
+const compressionProgress = ref({
+    percentage: 0,
+    text: '准备中...'
+});
+
+// 缩略图数据
+const thumbnails = ref([]);
 
 // 计算属性
 const currentImage = computed(() => {
@@ -167,7 +233,7 @@ const loadPanorama = async (data) => {
     });
 };
 
-// 从DB读取数据更新缩略图
+// 从DB读取数据更新缩略图 - 改为Vue响应式
 const updateThumbnailsFromDB = async (currentImageId) => {
     // 从DB获取图片列表
     const imageListFromDB = storage.getImageList();
@@ -179,33 +245,19 @@ const updateThumbnailsFromDB = async (currentImageId) => {
             if (imgData) {
                 const thumb = await createThumbnail(imgData, 100, 60);
                 const metadata = storage.getImageMetadata(imgId, {});
-                return `<img src="${thumb}" alt="${metadata.name || '图片'}" 
-                           style="width: 200px; height: 120px; margin: 2px; cursor: pointer; border: 2px solid ${imgId === currentImageId ? '#007bff' : 'transparent'}; border-radius: 4px;"
-                           data-image-id="${imgId}">`;
+                return {
+                    id: imgId,
+                    src: thumb,
+                    alt: metadata.name || '图片',
+                    isActive: imgId === currentImageId
+                };
             }
-            return '';
+            return null;
         })
     );
     
-    // 更新预览容器
-    const previewContainer = document.getElementById('previewContainer');
-    if (previewContainer) {
-        previewContainer.innerHTML = `
-            <div style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; max-height: 400px; overflow-y: auto;">
-                ${allThumbnails.filter(thumb => thumb).join('')}
-            </div>
-            <button id="uploader">添加图片</button>
-        `;
-
-        // 为缩略图添加点击事件
-        const thumbnails = previewContainer.querySelectorAll('[data-image-id]');
-        thumbnails.forEach(thumb => {
-            thumb.addEventListener('click', () => {
-                const imgId = thumb.getAttribute('data-image-id');
-                switchToImage(imgId);
-            });
-        });
-    }
+    // 更新缩略图数据
+    thumbnails.value = allThumbnails.filter(thumb => thumb);
 };
 
 const handleFileUploadComplete = (result) => {
@@ -232,6 +284,28 @@ const handleResolutionCancel = () => {
 const showResolutionDialogForExport = (callback) => {
     pendingResolutionCallback.value = callback;
     showResolutionDialog.value = true;
+};
+
+// 右键菜单处理
+const handleContextMenuAction = async (action) => {
+    showContextMenu.value = false;
+    eventBus.emit('context-menu-action', action);
+};
+
+// 触发文件输入
+const triggerFileInput = () => {
+    eventBus.emit('trigger-file-input');
+};
+
+// 显示消息提示
+const showMessageToast = (text, type = 'info') => {
+    messageText.value = text;
+    messageType.value = type;
+    showMessage.value = true;
+    
+    setTimeout(() => {
+        showMessage.value = false;
+    }, 3000);
 };
 
 // 监听事件总线
@@ -273,6 +347,99 @@ const setupEventListeners = () => {
         document.body.appendChild(input);
         input.click();
     });
+
+    // 监听右键菜单事件
+    eventBus.on('show-context-menu', ({ x, y }) => {
+        contextMenuPosition.value = { x, y };
+        showContextMenu.value = true;
+    });
+
+    eventBus.on('hide-context-menu', () => {
+        showContextMenu.value = false;
+    });
+
+    // 监听视频导出对话框事件
+    eventBus.on('show-video-export-dialog', () => {
+        showVideoExportDialog.value = true;
+    });
+
+    eventBus.on('hide-video-export-dialog', () => {
+        showVideoExportDialog.value = false;
+    });
+
+    // 监听导出进度事件
+    eventBus.on('show-export-progress', () => {
+        showExportProgress.value = true;
+    });
+
+    eventBus.on('hide-export-progress', () => {
+        showExportProgress.value = false;
+    });
+
+    eventBus.on('update-export-progress', (progressData) => {
+        exportProgress.value = {
+            percent: Math.round(progressData.progress * 100),
+            text: `${progressData.stage} ${progressData.currentFrame}/${progressData.totalFrames} (${Math.round(progressData.progress * 100)}%)`,
+            frameImage: progressData.frameImage
+        };
+    });
+
+    // 监听压缩进度事件
+    eventBus.on('show-compression-progress', () => {
+        showCompressionProgress.value = true;
+    });
+
+    eventBus.on('hide-compression-progress', () => {
+        showCompressionProgress.value = false;
+    });
+
+    eventBus.on('update-compression-progress', ({ text, percentage }) => {
+        compressionProgress.value = { text, percentage };
+    });
+
+    // 监听分辨率对话框事件
+    eventBus.on('show-resolution-dialog', ({ onSelect, resolutions }) => {
+        // 这里可以传递给ResolutionDialog组件
+        showResolutionDialogForExport(onSelect);
+    });
+
+    // 监听视频设置获取事件
+    eventBus.on('get-video-settings', (resolve) => {
+        const resolutionMap = {
+            '720p': { width: 1280, height: 720 },
+            '1080p': { width: 1920, height: 1080 },
+            '2K': { width: 2560, height: 1440 },
+            '4K': { width: 3840, height: 2160 }
+        };
+        
+        const settings = {
+            ...resolutionMap[videoSettings.value.resolution],
+            duration: videoSettings.value.duration,
+            fps: videoSettings.value.fps,
+            rotations: videoSettings.value.rotations
+        };
+        
+        resolve(settings);
+    });
+
+    // 监听消息提示事件
+    eventBus.on('show-error', (message) => {
+        showMessageToast(message, 'error');
+    });
+
+    eventBus.on('show-success', (message) => {
+        showMessageToast(message, 'success');
+    });
+};
+
+// 视频导出相关方法
+const startVideoExport = () => {
+    eventBus.emit('start-video-export');
+};
+
+const cancelVideoExport = () => {
+    eventBus.emit('cancel-video-export');
+    showVideoExportDialog.value = false;
 };
 
 // 生命周期
@@ -302,5 +469,247 @@ onMounted(() => {
 </script>
 
 <style>
-/* You might want to move some styles here from main.css or inline styles */
+/* 新增的样式 */
+.context-menu {
+    position: fixed;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+    min-width: 150px;
+}
+
+.context-menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.context-menu li {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+
+.context-menu li:hover {
+    background: #f5f5f5;
+}
+
+.context-menu li:last-child {
+    border-bottom: none;
+}
+
+.video-export-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dialog-content {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    min-width: 400px;
+}
+
+.form-group {
+    margin: 20px 0;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-right: 10px;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.export-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    z-index: 1001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.progress-content {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    min-width: 400px;
+    text-align: center;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 20px;
+    background: #f0f0f0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 20px 0;
+}
+
+.progress-bar {
+    height: 100%;
+    background: #007bff;
+    transition: width 0.3s;
+}
+
+.progress-text {
+    margin-top: 10px;
+    color: #666;
+}
+
+.preview-frame {
+    margin: 20px 0;
+    max-width: 320px;
+    max-height: 180px;
+}
+
+.preview-frame img {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.compression-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    z-index: 1002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.compression-content {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    min-width: 400px;
+    text-align: center;
+}
+
+.compression-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    transition: width 0.3s;
+}
+
+.compression-progress-text {
+    margin-top: 10px;
+    color: #666;
+    font-size: 14px;
+}
+
+.compression-info {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 5px;
+    font-size: 12px;
+    color: #666;
+}
+
+.message-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 20px;
+    border-radius: 4px;
+    color: white;
+    z-index: 1003;
+    max-width: 300px;
+}
+
+.message-toast.success {
+    background: #28a745;
+}
+
+.message-toast.error {
+    background: #dc3545;
+}
+
+.message-toast.info {
+    background: #17a2b8;
+}
+
+.preview-container {
+    margin-top: 20px;
+}
+
+.thumbnails-container {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.thumbnail {
+    width: 200px;
+    height: 120px;
+    margin: 2px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.thumbnail.active {
+    border-color: #007bff;
+}
+
+.upload-button {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.upload-button:hover {
+    background: #0056b3;
+}
 </style>
