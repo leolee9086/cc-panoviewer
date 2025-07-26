@@ -33,8 +33,8 @@
           <label>目标图片:</label>
           <select v-model="targetImageId">
             <option :value="currentImageId">当前图片</option>
-            <option v-for="imageId in imageList" :key="imageId" :value="imageId">
-              {{ getImageName(imageId) }}
+            <option v-for="imageItem in imageList" :key="imageItem.id" :value="imageItem.id">
+              {{ getImageName(imageItem.id) }}
             </option>
           </select>
         </div>
