@@ -570,7 +570,7 @@ export class PanoramaVideoGenerator {
         
         // 修复过曝问题：设置纹理的颜色空间
         texture.colorSpace = THREE.SRGBColorSpace;
-        texture.encoding = THREE.sRGBEncoding;
+        texture.encoding = THREE.SRGBColorSpace;
         
         const material = new THREE.MeshBasicMaterial({ map: texture });
         const sphere = new THREE.Mesh(geometry, material);

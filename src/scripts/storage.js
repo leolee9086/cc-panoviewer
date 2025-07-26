@@ -13,7 +13,7 @@ import { DocumentDB } from './document-db.js';
 let db = null;
 function ensureDbReady() {
     if (!db) {
-        db = new DocumentDB(document, '#cc-panoviewer-db');
+        db = new DocumentDB(document, 'cc-panoviewer-db');
     }
     return db;
 }
@@ -292,6 +292,17 @@ export const migrationTools = {
             }
         }
     },
+
+    /**
+     * 从DocumentDB根元素加载数据
+     */
+    migrateDocumentDBData: () => {
+        const dbRoot = document.querySelector('#cc-panoviewer-db');
+        if (dbRoot && dbRoot.children.length > 0) { // 检查是否有子元素，避免空DB导入
+            ensureDbReady().import(document.documentElement.outerHTML);
+            console.log('已从DocumentDB根元素加载数据');
+        }
+    },
     
     /**
      * 执行所有迁移
@@ -299,6 +310,7 @@ export const migrationTools = {
     migrateAll: () => {
         migrationTools.migrateGlobalData();
         migrationTools.migrateDOMData();
+        migrationTools.migrateDocumentDBData(); // 新增的迁移步骤
     }
 };
 

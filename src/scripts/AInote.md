@@ -439,6 +439,96 @@
 - ✅ 逻辑更简洁，代码更易维护
 - ✅ 保持DocumentDB的优势，同时确保只包含压缩数据
 
+### 2025-07-27 01:27:04 - DocumentDB ID参数优化和cleanDocument修复
+
+#### 问题分析
+1. **DocumentDB参数不一致**：`rootSelector`参数应该是ID而不是选择器，避免恢复和生成过程过于复杂
+2. **cleanDocument获取问题**：`cleanDocumentClone`的获取时机有问题，导致下载的页面包含Vue初始化后的状态
+
+#### 修复内容
+
+##### ✅ **DocumentDB参数优化**
+1. **构造函数参数修改**：
+   - `rootSelector` → `rootId`（直接使用ID而不是选择器）
+   - 默认值：`'#document-db'` → `'document-db'`
+   - 内部使用`getElementById`而不是`querySelector`
+
+2. **内部方法优化**：
+   - `getOrCreateRoot()`使用`getElementById`查找元素
+   - `exportDocument()`使用`getElementById`查找数据库元素
+   - `import()`使用`getElementById`查找数据库元素
+   - `clone()`方法传递正确的`rootId`参数
+
+3. **调用方修复**：
+   - `storage.js`：`new DocumentDB(document, 'cc-panoviewer-db')`
+   - `event-handlers.js`：`new DocumentDB(tempDocument, 'cc-panoviewer-db')`
+
+##### ✅ **cleanDocument获取修复**
+1. **时机优化**：在Vue应用创建之前立即创建干净的document克隆
+2. **导入修复**：`event-handlers.js`正确导入`getCleanDocumentClone()`函数
+3. **使用修复**：使用`getCleanDocumentClone()`而不是局部变量
+
+#### 技术优势
+- **参数更清晰**：直接使用ID，避免选择器解析的复杂性
+- **性能更优**：`getElementById`比`querySelector`更快
+- **逻辑更简单**：恢复和生成过程更直接
+- **状态更干净**：下载的页面不包含Vue初始化后的状态
+
+#### 预期效果
+- ✅ DocumentDB参数使用更合理
+- ✅ 下载的页面状态更干净，不包含Vue初始化后的状态
+- ✅ 代码逻辑更清晰，维护更容易
+
+### 2025-07-27 01:22:52 - DocumentDB ID不一致问题修复
+
+#### 问题分析
+发现storage.js和document-db.js中存在ID不一致问题：
+1. **storage.js** 中使用 `#cc-panoviewer-db` 选择器
+2. **document-db.js** 中默认使用 `#document-db` 选择器
+3. **document-db.js** 内部多处硬编码 `document-db` ID
+4. **rootSelector参数设计不合理**：应该直接使用ID而不是选择器
+
+#### 修复内容
+
+##### 1. DocumentDB构造函数参数优化
+- ✅ **参数类型统一**：`rootSelector` 改为 `rootId`，直接使用ID而不是选择器
+- ✅ **默认值修正**：默认值从 `#document-db` 改为 `document-db`
+- ✅ **内部存储优化**：`this.rootSelector` 改为 `this.rootId`
+
+##### 2. DOM操作优化
+- ✅ **getOrCreateRoot方法**：使用 `getElementById()` 替代 `querySelector()`
+- ✅ **ID设置统一**：创建元素时使用传入的 `rootId` 而不是硬编码
+- ✅ **导出文档优化**：使用 `this.rootId` 动态生成CSS样式和查找元素
+- ✅ **导入功能优化**：使用 `getElementById(this.rootId)` 查找数据库元素
+
+##### 3. 调用方修正
+- ✅ **storage.js修正**：`new DocumentDB(document, 'cc-panoviewer-db')`
+- ✅ **event-handlers.js修正**：`new DocumentDB(tempDocument, 'cc-panoviewer-db')`
+- ✅ **clone方法修正**：传递 `this.rootId` 确保克隆实例使用相同ID
+
+##### 4. 测试文件兼容性
+- ✅ **测试文件保持兼容**：测试文件使用默认参数，自动使用 `document-db` ID
+- ✅ **无需修改测试**：测试文件中的 `new DocumentDB(doc)` 调用仍然有效
+
+#### 技术优势
+- **参数设计更合理**：直接使用ID而不是选择器，简化逻辑
+- **避免硬编码**：所有ID都通过参数传递，提高灵活性
+- **性能优化**：使用 `getElementById()` 比 `querySelector()` 更快
+- **代码一致性**：所有DocumentDB实例都使用统一的ID管理方式
+- **维护性提升**：ID变更只需要修改调用方，不需要修改内部实现
+
+#### 解决的问题
+- ✅ **ID不一致问题**：storage.js和document-db.js现在使用一致的ID
+- ✅ **硬编码问题**：移除document-db.js中的硬编码ID
+- ✅ **参数设计问题**：rootSelector改为rootId，更符合实际用途
+- ✅ **性能问题**：使用更高效的DOM查询方法
+
+#### 预期效果
+- ✅ 所有DocumentDB实例使用统一的ID管理
+- ✅ 代码更清晰，逻辑更简洁
+- ✅ 性能略有提升（getElementById vs querySelector）
+- ✅ 维护性更好，ID变更更容易
+
 ## 下一步计划
 1. 第三阶段：实现高级功能（撤销/重做、数据导出、性能优化）
 2. 第四阶段：文档清理和性能监控

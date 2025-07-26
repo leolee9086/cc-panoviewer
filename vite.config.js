@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
 import { resolve } from 'path';
 import { writeFileSync, unlinkSync, existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
@@ -44,6 +45,9 @@ export default defineConfig(({ mode }) => {
       }
     },
     plugins: isSingleMode ? [
+      vue({
+        include: [/\.vue$/] // 只包含 .vue 文件
+      }),
       {
         name: 'inline-assets',
         writeBundle(options, bundle) {
@@ -64,15 +68,14 @@ export default defineConfig(({ mode }) => {
             });
 
             // 内联所有JS文件
-            Object.values(bundle).forEach(asset => {
-              if (asset.type === 'chunk' && asset.fileName.endsWith('.js')) {
-                const jsContent = asset.code;
-                const jsFileName = asset.fileName.split('/').pop();
-                $(`script[src*="${jsFileName}"]`).each((_, el) => {
-                  $(el).replaceWith(`<script>${jsContent}</script>`);
-                });
-              }
-            });
+            const mainJsChunk = Object.values(bundle).find(asset => asset.type === 'chunk' && asset.isEntry && asset.fileName.endsWith('.js'));
+            if (mainJsChunk) {
+              const jsContent = mainJsChunk.code;
+              // Remove the original script tag for main.js if it exists
+              $('script[src*="main.js"]').remove();
+              // Append the inlined script to the body
+              $('body').append(`<script type="module">${jsContent}</script>`);
+            }
 
             // 内联本地Pannellum库文件
             try {

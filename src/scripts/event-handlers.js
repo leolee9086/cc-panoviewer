@@ -1,12 +1,9 @@
-import { createViewer } from './viewer-manager.js';
-import { handleFileUpload } from './file-handler.js';
-import { downloadPage, downloadEmptyPage } from './download-utils.js';
+import { downloadPage, downloadEmptyPage, getCleanDocumentClone } from './download-utils.js';
 import { storage } from './storage.js';
 import { PanoramaVideoGenerator, saveVideoBlob } from './panorama-exporter.js';
 import { DocumentDB } from './document-db.js';
-
-// 存储干净的document克隆，用于导出时作为蓝本
-let cleanDocumentClone = null;
+import { eventBus } from './main.js'; // Import eventBus
+import { handleFileUpload } from './file-handler.js';
 
 // 常用分辨率选项（仅用于导出压缩版页面）
 const COMMON_RESOLUTIONS = [
@@ -231,11 +228,11 @@ async function exportCompressedPage(resolution) {
     const compressed = await compressImage(src, targetW, targetH);
     
     // 使用干净的document克隆作为蓝本，如果没有则使用当前document
-    const sourceDocument = cleanDocumentClone || document;
+    const sourceDocument = getCleanDocumentClone() || document;
     const tempDocument = sourceDocument.cloneNode(true);
     
     // 在临时document中创建新的DocumentDB实例
-    const tempDb = new DocumentDB(tempDocument);
+    const tempDb = new DocumentDB(tempDocument, 'cc-panoviewer-db');
     
     // 直接用压缩后的图片数据替换原来的图片数据
     tempDb.set(`image.${currentImageId}`, compressed, { type: 'base64' });
@@ -326,11 +323,14 @@ function setupDragAndDrop() {
         event.preventDefault();
     });
 
-    document.body.addEventListener('drop', function (event) {
+    document.body.addEventListener('drop', async function (event) {
         event.preventDefault();
         if (event.dataTransfer.files.length) {
-            document.getElementById('uploadPrompt').textContent = "正在打开文件";
-            handleFileUpload(event.dataTransfer.files[0]);
+            // document.getElementById('uploadPrompt').textContent = "正在打开文件"; // This is now handled by Vue
+            const result = await handleFileUpload(event.dataTransfer.files);
+            if (result) {
+                eventBus.emit('file-dropped', result);
+            }
         }
     });
 }
@@ -340,40 +340,34 @@ function setupDragAndDrop() {
  */
 function setupPreviewContainer() {
     const previewContainer = document.getElementById('previewContainer');
-    
-    previewContainer.addEventListener('click', (e) => {
+
+    previewContainer.addEventListener('click', async (e) => {
         if (e.target.src && e.target.id === 'previewImage') {
-            // 获取当前图片编号
+            // Get current image ID from storage
             const currentImageId = storage.getCurrentImage();
             if (currentImageId) {
-                // 从DB获取原图数据
+                // Get original image data from DB
                 const imageData = storage.getImage(currentImageId);
                 if (imageData) {
-                    // 创建viewer（使用原图）
-                    const viewer = createViewer('panorama', {
-                        "type": "equirectangular",
-                        "panorama": imageData,
-                        "autoLoad": true,
-                        "showControls": true,
-                        "autoRotate": true,
-                        "hotSpots": []
-                    });
+                    eventBus.emit('load-panorama', { imageId: currentImageId, base64data: imageData });
                 }
             }
         } else if (e.target === document.getElementById('uploader')) {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.onchange = e => {
-                if (e.target.files.length) {
-                    const file = e.target.files[0];
-                    handleFileUpload(file);
-                }
-            };
-            input.click();
+            // This part is now handled by UploadPrompt.vue
+            // const input = document.createElement('input');
+            // input.type = 'file';
+            // input.accept = 'image/*';
+            // input.onchange = e => {
+            //     if (e.target.files.length) {
+            //         const file = e.target.files[0];
+            //         handleFileUpload(file);
+            //     }
+            // };
+            // input.click();
+            eventBus.emit('trigger-file-input'); // Emit event to trigger file input in Vue component
         }
     });
-    
+
     previewContainer.addEventListener('contextmenu', (e) => {
         if (e.target.src) {
             e.target.remove();
@@ -385,13 +379,13 @@ function setupPreviewContainer() {
 /**
  * 设置文件输入事件
  */
-function setupFileInput() {
-    document.getElementById('fileInput').addEventListener('change', function (event) {
-        if (this.files.length) {
-            handleFileUpload(this.files[0]);
-        }
-    });
-}
+// function setupFileInput() { // This function is no longer needed as file input is handled by Vue
+//     document.getElementById('fileInput').addEventListener('change', function (event) {
+//         if (this.files.length) {
+//             handleFileUpload(this.files[0]);
+//         }
+//     });
+// }
 
 /**
  * 设置视频导出对话框事件
@@ -418,6 +412,6 @@ export function setupEventListeners() {
     setupContextMenu();
     setupDragAndDrop();
     setupPreviewContainer();
-    setupFileInput();
+    // setupFileInput(); // No longer needed
     setupVideoExportDialog();
-} 
+}

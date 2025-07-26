@@ -6,11 +6,12 @@
 export class DocumentDB {
     /**
      * @param {Document} document - 目标document对象
-     * @param {string} rootSelector - 数据库根元素选择器
+     * @param {string} rootId - 数据库根元素ID
      */
-    constructor(document, rootSelector = '#document-db') {
+    constructor(document, rootId = 'document-db') {
         this.document = document;
-        this.root = this.getOrCreateRoot(rootSelector);
+        this.rootId = rootId;
+        this.root = this.getOrCreateRoot(rootId);
         this.transactionStack = [];
         this.isInTransaction = false;
     }
@@ -195,17 +196,17 @@ export class DocumentDB {
         // 添加样式
         const style = newDoc.createElement('style');
         style.textContent = `
-#document-db { display: none !important; }
-#document-db [data-key] { display: none !important; }
+#${this.rootId} { display: none !important; }
+#${this.rootId} [data-key] { display: none !important; }
 `;
         newDoc.head.appendChild(style);
         // 复制body内容
         newDoc.body.innerHTML = this.document.body.innerHTML;
         // 确保数据库元素存在且不可见
-        let dbRoot = newDoc.querySelector('#document-db');
+        let dbRoot = newDoc.getElementById(this.rootId);
         if (!dbRoot) {
             dbRoot = newDoc.createElement('span');
-            dbRoot.id = 'document-db';
+            dbRoot.id = this.rootId;
             dbRoot.style.display = 'none';
             newDoc.body.appendChild(dbRoot);
         }
@@ -223,7 +224,7 @@ export class DocumentDB {
     import(htmlData) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlData, 'text/html');
-        const dbElement = doc.querySelector('#document-db');
+        const dbElement = doc.getElementById(this.rootId);
         if (dbElement) {
             this.clear();
             dbElement.querySelectorAll('[data-key]').forEach(element => {
@@ -241,7 +242,7 @@ export class DocumentDB {
      */
     clone() {
         const newDocument = this.document.cloneNode(true);
-        return new DocumentDB(newDocument);
+        return new DocumentDB(newDocument, this.rootId);
     }
 
     /**
@@ -303,12 +304,12 @@ export class DocumentDB {
     }
 
     // 私有方法 - 优化的DOM操作
-    getOrCreateRoot(selector) {
-        let root = this.document.querySelector(selector);
+    getOrCreateRoot(rootId) {
+        let root = this.document.getElementById(rootId);
         if (!root) {
             // 使用更轻量的span元素而不是div
             root = this.document.createElement('span');
-            root.id = 'document-db';
+            root.id = rootId;
             // 使用display: none完全避免回流和重绘
             root.style.display = 'none';
             // 使用DocumentFragment减少重绘
