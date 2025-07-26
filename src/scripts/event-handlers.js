@@ -1,9 +1,12 @@
 import { createViewer } from './viewer-manager.js';
 import { handleFileUpload } from './file-handler.js';
-import { downloadPage } from './download-utils.js';
+import { downloadPage, downloadEmptyPage } from './download-utils.js';
 import { storage } from './storage.js';
 import { PanoramaVideoGenerator, saveVideoBlob } from './panorama-exporter.js';
 import { DocumentDB } from './document-db.js';
+
+// 存储干净的document克隆，用于导出时作为蓝本
+let cleanDocumentClone = null;
 
 // 常用分辨率选项（仅用于导出压缩版页面）
 const COMMON_RESOLUTIONS = [
@@ -227,8 +230,9 @@ async function exportCompressedPage(resolution) {
     const targetW = resolution.width, targetH = resolution.height;
     const compressed = await compressImage(src, targetW, targetH);
     
-    // 创建临时克隆版document
-    const tempDocument = document.cloneNode(true);
+    // 使用干净的document克隆作为蓝本，如果没有则使用当前document
+    const sourceDocument = cleanDocumentClone || document;
+    const tempDocument = sourceDocument.cloneNode(true);
     
     // 在临时document中创建新的DocumentDB实例
     const tempDb = new DocumentDB(tempDocument);
@@ -301,6 +305,9 @@ function setupContextMenu() {
         const action = event.target.getAttribute('data-action');
         if (action === 'download-page') {
             downloadPage();
+        }
+        if (action === 'download-empty-page') {
+            downloadEmptyPage();
         }
         if (action === 'export-compressed') {
             showResolutionDialog(exportCompressedPage);

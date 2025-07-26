@@ -3,6 +3,7 @@ import { setupEventListeners } from './event-handlers.js';
 import { createViewer } from './viewer-manager.js';
 import { handleFileUpload } from './file-handler.js';
 import { storage, migrationTools } from './storage.js';
+import { setCleanDocumentClone } from './download-utils.js';
 
 /**
  * 生成缩略图（仅在内存中，不写入DB）
@@ -35,6 +36,10 @@ function initApp() {
         document.addEventListener('DOMContentLoaded', initApp);
         return;
     }
+    
+    // 页面初始化完成之后，DB初始化之前，存储一份干净的document克隆
+    const cleanDocumentClone = document.cloneNode(true);
+    setCleanDocumentClone(cleanDocumentClone);
     
     // 初始化存储系统
     initStorage();
