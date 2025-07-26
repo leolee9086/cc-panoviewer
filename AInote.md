@@ -1209,36 +1209,47 @@ a[href^="angle://"] {
 - **服务扩展**: 提供定制开发服务，扩大业务范围
 - **用户体验**: 在默认消息中提供完整的服务信息
 
-### 2025-01-27 16:55 - 配置GitHub Pages自动部署
+### 2025-01-27 16:55 - 配置GitHub Pages本地构建部署
 
 #### 主要修改
 1. **创建GitHub Actions工作流** (`.github/workflows/deploy.yml`)
-   - 配置自动构建和部署到GitHub Pages
+   - 配置部署本地构建结果到GitHub Pages
    - 使用`peaceiris/actions-gh-pages@v3`进行部署
-   - 设置触发条件：推送到main/master分支时自动部署
-   - 配置Node.js环境和依赖安装
+   - 设置触发条件：推送dist目录时自动部署
+   - 移除自动构建步骤，使用本地构建结果
 
 #### 技术要点
-- **自动化部署**: 使用GitHub Actions实现CI/CD
-- **构建优化**: 使用`npm run build:single`生成单文件应用
-- **分支部署**: 部署到`gh-pages`分支，适合GitHub Pages
-- **缓存优化**: 使用npm缓存加速构建过程
+- **本地构建**: 在本地运行`npm run build:single`生成构建结果
+- **路径触发**: 只有dist目录变化时才触发部署
+- **直接部署**: 直接部署本地构建的dist目录内容
+- **简化流程**: 移除GitHub Actions中的构建步骤
 
 #### 功能特性
-- **自动构建**: 推送代码后自动触发构建
-- **单文件部署**: 部署自包含的单文件HTML应用
+- **本地控制**: 完全在本地控制构建过程
+- **快速部署**: 推送dist目录后立即部署
 - **版本控制**: 每次部署都会创建新的gh-pages分支
-- **状态监控**: 可在Actions页面查看构建状态
+- **状态监控**: 可在Actions页面查看部署状态
 
 #### 部署流程
-1. 推送代码到main/master分支
-2. GitHub Actions自动触发构建
-3. 安装依赖并运行`npm run build:single`
+1. 本地运行`npm run build:single`生成构建结果
+2. 提交并推送dist目录到main分支
+3. GitHub Actions检测到dist目录变化
 4. 将dist目录内容部署到gh-pages分支
 5. GitHub Pages自动从gh-pages分支提供服务
 
+#### 使用方法
+```bash
+# 本地构建
+npm run build:single
+
+# 提交构建结果
+git add dist/
+git commit -m "Update build"
+git push origin main
+```
+
 #### 下一步操作
 - 在GitHub仓库设置中配置Pages源为gh-pages分支
-- 推送代码触发首次构建
-- 检查Actions页面确认构建成功
+- 本地构建后推送dist目录
+- 检查Actions页面确认部署成功
 - 访问`https://[用户名].github.io/[仓库名]`查看部署结果
