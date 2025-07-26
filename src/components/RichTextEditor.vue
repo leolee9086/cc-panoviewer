@@ -527,19 +527,49 @@ const handleAngleLinkClick = (event) => {
 const jumpToAngle = (angleLink) => {
   try {
     if (angleLink.targetImageId && angleLink.targetImageId !== props.currentImageId) {
+      // 跨图片视角链接：先切换图片，等待切换完成后再转动视角
       eventBus.emit('switch-to-image', angleLink.targetImageId);
-    }
-    
-    const viewer = getViewer();
-    if (viewer) {
+      
+      // 监听图片切换完成事件
+      const handleImageSwitched = () => {
+        // 移除事件监听器
+        eventBus.off('image-switched', handleImageSwitched);
+        
+        // 等待图片完全加载后再转动视角
+        setTimeout(() => {
+          try {
+            const viewer = getViewer();
+            if (viewer) {
+              const currentHfov = viewer.getHfov();
+              viewer.lookAt(angleLink.pitch, angleLink.yaw, currentHfov);
+            }
+          } catch (error) {
+            console.error('跳转角度失败:', error);
+          }
+        }, 500); // 增加延迟确保图片完全加载
+      };
+      
+      // 添加图片切换完成事件监听器
+      eventBus.on('image-switched', handleImageSwitched);
+      
+      // 设置超时保护，防止事件监听器一直存在
       setTimeout(() => {
-        try {
-          const currentHfov = viewer.getHfov();
-          viewer.lookAt(angleLink.pitch, angleLink.yaw, currentHfov);
-        } catch (error) {
-          console.error('跳转角度失败:', error);
-        }
-      }, 200);
+        eventBus.off('image-switched', handleImageSwitched);
+      }, 10000);
+      
+    } else {
+      // 同图片视角链接：直接转动视角
+      const viewer = getViewer();
+      if (viewer) {
+        setTimeout(() => {
+          try {
+            const currentHfov = viewer.getHfov();
+            viewer.lookAt(angleLink.pitch, angleLink.yaw, currentHfov);
+          } catch (error) {
+            console.error('跳转角度失败:', error);
+          }
+        }, 200);
+      }
     }
   } catch (error) {
     console.error('角度跳转失败:', error);

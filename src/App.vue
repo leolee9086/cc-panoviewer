@@ -405,6 +405,15 @@ const setupEventListeners = () => {
         loadPanorama(data);
     });
 
+    // 监听图片切换事件
+    eventBus.on('switch-to-image', (imageId) => {
+        switchToImage(imageId);
+        // 触发图片切换完成事件
+        setTimeout(() => {
+            eventBus.emit('image-switched', imageId);
+        }, 100); // 给一点时间让图片加载
+    });
+
     // 监听trigger-file-input事件，用于触发文件选择
     eventBus.on('trigger-file-input', () => {
         // 创建一个隐藏的文件输入元素
