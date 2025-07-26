@@ -11,14 +11,21 @@
             @cancel="handleResolutionCancel" 
         />
         
+        <!-- 统一导出对话框 -->
+        <ExportDialog 
+            :visible="showExportDialog" 
+            @close="handleExportDialogClose" 
+            @export-complete="handleExportComplete" 
+        />
+        
         <!-- 右键菜单 - 改为Vue组件 -->
         <div v-if="showContextMenu" 
              :style="{ top: contextMenuPosition.y + 'px', left: contextMenuPosition.x + 'px' }"
              class="context-menu">
             <ul>
+                <li @click="handleContextMenuAction('export-page')">导出页面（选择图片和压缩）</li>
                 <li @click="handleContextMenuAction('download-page')">下载当前页面（含数据）</li>
                 <li @click="handleContextMenuAction('download-empty-page')">下载空页面（无数据）</li>
-                <li @click="handleContextMenuAction('export-compressed')">导出压缩版页面</li>
                 <li @click="handleContextMenuAction('export-video')">导出视频</li>
             </ul>
         </div>
@@ -138,6 +145,7 @@
 import { ref, onMounted, computed, nextTick } from 'vue';
 import UploadPrompt from './components/UploadPrompt.vue';
 import ResolutionDialog from './components/ResolutionDialog.vue';
+import ExportDialog from './components/ExportDialog.vue';
 import { initApp, eventBus } from './scripts/main.js';
 import { createViewer } from './scripts/viewer-manager.js';
 import { storage } from './scripts/storage.js';
@@ -149,6 +157,7 @@ const imageList = ref([]);
 const currentImageId = ref(null);
 const showResolutionDialog = ref(false);
 const pendingResolutionCallback = ref(null);
+const showExportDialog = ref(false);
 
 // 新增的响应式数据
 const showContextMenu = ref(false);
@@ -280,6 +289,16 @@ const handleResolutionCancel = () => {
     pendingResolutionCallback.value = null;
 };
 
+// 导出对话框处理方法
+const handleExportDialogClose = () => {
+    showExportDialog.value = false;
+};
+
+const handleExportComplete = () => {
+    showExportDialog.value = false;
+    showMessageToast('导出完成！', 'success');
+};
+
 // 显示分辨率对话框的方法（供外部调用）
 const showResolutionDialogForExport = (callback) => {
     pendingResolutionCallback.value = callback;
@@ -401,6 +420,11 @@ const setupEventListeners = () => {
     eventBus.on('show-resolution-dialog', ({ onSelect, resolutions }) => {
         // 这里可以传递给ResolutionDialog组件
         showResolutionDialogForExport(onSelect);
+    });
+
+    // 监听统一导出对话框事件
+    eventBus.on('show-export-dialog', () => {
+        showExportDialog.value = true;
     });
 
     // 监听视频设置获取事件

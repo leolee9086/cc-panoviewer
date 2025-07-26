@@ -30,10 +30,9 @@ function compressImage(src, width, height) {
     });
 }
 
-// 弹窗选择分辨率 - 改为通过事件总线通知Vue组件
-function showResolutionDialog(onSelect) {
-    // 使用事件总线通知Vue组件显示分辨率对话框
-    eventBus.emit('show-resolution-dialog', { onSelect, resolutions: COMMON_RESOLUTIONS });
+// 显示统一导出对话框 - 改为通过事件总线
+function showExportDialog() {
+    eventBus.emit('show-export-dialog');
 }
 
 // 视频导出相关变量
@@ -363,7 +362,8 @@ export function setupEventListeners() {
                 downloadEmptyPage();
                 break;
             case 'export-compressed':
-                showResolutionDialog(exportCompressedPage);
+            case 'export-page':
+                showExportDialog();
                 break;
             case 'export-video':
                 showVideoExportDialog();

@@ -1,5 +1,5 @@
 {
-  "status": "timedout",
+  "status": "interrupted",
   "failedTests": [
     "2ed049b7ad09df59bfa2-138dfa8a759a818cc14e",
     "2ed049b7ad09df59bfa2-4292f4d3cbcc6f02453c",
