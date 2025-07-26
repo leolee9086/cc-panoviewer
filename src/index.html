@@ -23,7 +23,60 @@
         <ul>
             <li data-action="download-page">下载当前页面</li>
             <li data-action="export-compressed">导出压缩版页面</li>
+            <li data-action="export-video">导出视频</li>
         </ul>
+    </div>
+    
+    <!-- 视频导出对话框 -->
+    <div id="videoExportDialog" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; min-width: 400px;">
+            <h3>导出全景视频</h3>
+            <div style="margin: 20px 0;">
+                <label>分辨率:</label>
+                <select id="videoResolution">
+                    <option value="720p">720p (1280x720)</option>
+                    <option value="1080p" selected>1080p (1920x1080)</option>
+                    <option value="2K">2K (2560x1440)</option>
+                    <option value="4K">4K (3840x2160)</option>
+                </select>
+            </div>
+            <div style="margin: 20px 0;">
+                <label>时长 (秒):</label>
+                <input type="number" id="videoDuration" value="10" min="1" max="60" style="width: 80px;">
+            </div>
+            <div style="margin: 20px 0;">
+                <label>帧率 (FPS):</label>
+                <select id="videoFps">
+                    <option value="24">24 FPS</option>
+                    <option value="30" selected>30 FPS</option>
+                    <option value="60">60 FPS</option>
+                </select>
+            </div>
+            <div style="margin: 20px 0;">
+                <label>旋转圈数:</label>
+                <input type="number" id="videoRotations" value="1" min="0.1" max="5" step="0.1" style="width: 80px;">
+            </div>
+            <div style="margin: 20px 0;">
+                <button id="startVideoExport" style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-right: 10px;">开始导出</button>
+                <button id="cancelVideoExport" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 导出进度显示 -->
+    <div id="exportProgress" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1001;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; min-width: 400px; text-align: center;">
+            <h3>正在导出视频...</h3>
+            <div style="margin: 20px 0;">
+                <div style="width: 100%; height: 20px; background: #f0f0f0; border-radius: 10px; overflow: hidden;">
+                    <div id="progressBar" style="width: 0%; height: 100%; background: #007bff; transition: width 0.3s;"></div>
+                </div>
+                <div id="progressText" style="margin-top: 10px;">准备中...</div>
+            </div>
+            <div id="previewFrame" style="margin: 20px 0; max-width: 320px; max-height: 180px;">
+                <!-- 预览帧将在这里显示 -->
+            </div>
+        </div>
     </div>
     
     <div id="files">

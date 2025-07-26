@@ -141,9 +141,9 @@ function handleImageFile(file) {
  * 处理HTML文件
  * @param {File} file - HTML文件
  */
-function handleHTMLFile(file) {
+async function handleHTMLFile(file) {
     const reader = new FileReader();
-    reader.onload = function (e) {
+    reader.onload = async function (e) {
         const htmlContent = e.target.result;
         // 尝试解析HTML并查找特定的数据标记
         const parser = new DOMParser();
@@ -168,14 +168,48 @@ function handleHTMLFile(file) {
         }
         
         if (base64data) {
-            // 添加到预览容器
+            // 保存到统一存储
+            storage.setImage('original', base64data);
+            storage.setImage('current', base64data);
+            
+            // 生成多分辨率压缩图
+            const compressedList = await Promise.all(
+                COMMON_RESOLUTIONS.map(async (item) => ({
+                    label: item.label,
+                    base64: item.width ? await compressImage(base64data, item.width, item.height) : base64data
+                }))
+            );
+            
+            // 保存压缩版本到缓存
+            storage.setFile('compressedCache', compressedList);
+            
+            // 预览区提供分辨率选择
+            let selectHtml = '<select id="resolutionSelect">';
+            compressedList.forEach((item, idx) => {
+                selectHtml += `<option value="${idx}">${item.label}</option>`;
+            });
+            selectHtml += '</select>';
+            
+            // 从统一存储获取当前图片数据
+            const currentImageData = storage.getImage('current');
             document.getElementById('previewContainer').innerHTML = `
-                <img id="previewImage" src="${base64data}" alt="Preview">
+                <div style="margin-bottom:8px;">选择分辨率：${selectHtml}</div>
+                <img id="previewImage" src="${currentImageData}" alt="Preview">
             ` + document.getElementById('previewContainer').innerHTML;
+            
+            // 选择分辨率时切换预览
+            document.getElementById('resolutionSelect').addEventListener('change', function () {
+                const idx = this.value;
+                const selectedImageData = compressedList[idx].base64;
+                document.getElementById('previewImage').src = selectedImageData;
+                // 保存当前选择的图片数据
+                storage.setImage('current', selectedImageData);
+            });
+            
             // 创建查看器
             const viewer = createViewer('panorama', {
                 "type": "equirectangular",
-                "panorama": base64data,
+                "panorama": currentImageData,
                 "sceneFadeDuration": 1000,
                 "autoLoad": true,
                 "showControls": true,
@@ -188,6 +222,14 @@ function handleHTMLFile(file) {
                     "URL": "https://artbma.org/"
                 }]
             });
+            
+            // 记录操作历史
+            storage.addHistory('html_file_upload', {
+                fileName: file.name,
+                fileSize: file.size,
+                resolution: 'original'
+            });
+            
             document.getElementById('uploadPrompt').style.display = 'none';
         } else {
             document.getElementById('uploadPrompt').textContent = "无法从HTML文件中找到全景图数据";

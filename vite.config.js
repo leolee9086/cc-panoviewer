@@ -23,9 +23,9 @@ function removeAllExceptIndexHtml(distDir) {
 export default defineConfig(({ mode }) => {
   const isSingleMode = mode === 'single';
   return {
-    root: '.',
+    root: 'src',
     build: {
-      outDir: '../dist',
+      outDir: './dist',
       emptyOutDir: true,
       rollupOptions: {
         input: {

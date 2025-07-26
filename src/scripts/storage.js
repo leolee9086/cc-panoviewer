@@ -5,8 +5,13 @@
  */
 import { DocumentDB } from './document-db.js';
 
-// 创建统一的存储实例
-export const db = new DocumentDB(document, '#cc-panoviewer-db');
+let db = null;
+function ensureDbReady() {
+    if (!db) {
+        db = new DocumentDB(document, '#cc-panoviewer-db');
+    }
+    return db;
+}
 
 /**
  * 统一存储接口
@@ -17,7 +22,7 @@ export const storage = {
      * @param {string} key - 图片键名
      * @param {string} data - 图片数据（base64格式）
      */
-    setImage: (key, data) => db.set(`image.${key}`, data, { type: 'base64' }),
+    setImage: (key, data) => ensureDbReady().set(`image.${key}`, data, { type: 'base64' }),
     
     /**
      * 获取图片数据
@@ -25,14 +30,14 @@ export const storage = {
      * @param {string} defaultValue - 默认值
      * @returns {string} 图片数据
      */
-    getImage: (key, defaultValue = null) => db.get(`image.${key}`, defaultValue),
+    getImage: (key, defaultValue = null) => ensureDbReady().get(`image.${key}`, defaultValue),
     
     /**
      * 设置配置项
      * @param {string} key - 配置键名
      * @param {any} value - 配置值
      */
-    setConfig: (key, value) => db.set(`config.${key}`, value),
+    setConfig: (key, value) => ensureDbReady().set(`config.${key}`, value),
     
     /**
      * 获取配置项
@@ -40,14 +45,14 @@ export const storage = {
      * @param {any} defaultValue - 默认值
      * @returns {any} 配置值
      */
-    getConfig: (key, defaultValue = null) => db.get(`config.${key}`, defaultValue),
+    getConfig: (key, defaultValue = null) => ensureDbReady().get(`config.${key}`, defaultValue),
     
     /**
      * 设置文件相关数据
      * @param {string} key - 文件键名
      * @param {any} data - 文件数据
      */
-    setFile: (key, data) => db.set(`files.${key}`, data),
+    setFile: (key, data) => ensureDbReady().set(`files.${key}`, data),
     
     /**
      * 获取文件相关数据
@@ -55,14 +60,14 @@ export const storage = {
      * @param {any} defaultValue - 默认值
      * @returns {any} 文件数据
      */
-    getFile: (key, defaultValue = null) => db.get(`files.${key}`, defaultValue),
+    getFile: (key, defaultValue = null) => ensureDbReady().get(`files.${key}`, defaultValue),
     
     /**
      * 设置查看器相关数据
      * @param {string} key - 查看器键名
      * @param {any} data - 查看器数据
      */
-    setViewer: (key, data) => db.set(`viewer.${key}`, data),
+    setViewer: (key, data) => ensureDbReady().set(`viewer.${key}`, data),
     
     /**
      * 获取查看器相关数据
@@ -70,7 +75,7 @@ export const storage = {
      * @param {any} defaultValue - 默认值
      * @returns {any} 查看器数据
      */
-    getViewer: (key, defaultValue = null) => db.get(`viewer.${key}`, defaultValue),
+    getViewer: (key, defaultValue = null) => ensureDbReady().get(`viewer.${key}`, defaultValue),
     
     /**
      * 添加操作历史记录
@@ -78,7 +83,7 @@ export const storage = {
      * @param {any} data - 操作数据
      */
     addHistory: (action, data) => {
-        const history = db.get('history.operations', []);
+        const history = ensureDbReady().get('history.operations', []);
         history.push({ 
             action, 
             data, 
@@ -88,7 +93,7 @@ export const storage = {
         if (history.length > 100) {
             history.splice(0, history.length - 100);
         }
-        db.set('history.operations', history);
+        ensureDbReady().set('history.operations', history);
     },
     
     /**
@@ -97,7 +102,7 @@ export const storage = {
      * @returns {Array} 历史记录数组
      */
     getHistory: (limit = 50) => {
-        const history = db.get('history.operations', []);
+        const history = ensureDbReady().get('history.operations', []);
         return history.slice(-limit);
     },
     
@@ -107,13 +112,13 @@ export const storage = {
      * @returns {Promise<any>} 事务结果
      */
     withTransaction: async (callback) => {
-        const txId = db.beginTransaction();
+        const txId = ensureDbReady().beginTransaction();
         try {
             const result = await callback();
-            db.commitTransaction(txId);
+            ensureDbReady().commitTransaction(txId);
             return result;
         } catch (error) {
-            db.rollbackTransaction(txId);
+            ensureDbReady().rollbackTransaction(txId);
             throw error;
         }
     },
@@ -123,13 +128,13 @@ export const storage = {
      * @param {string} key - 数据键名
      * @returns {boolean} 是否存在
      */
-    has: (key) => db.has(key),
+    has: (key) => ensureDbReady().has(key),
     
     /**
      * 删除数据
      * @param {string} key - 数据键名
      */
-    delete: (key) => db.delete(key),
+    delete: (key) => ensureDbReady().delete(key),
     
     /**
      * 列出所有数据键
@@ -137,7 +142,7 @@ export const storage = {
      * @returns {Array<string>} 键名数组
      */
     list: (prefix = '') => {
-        const allKeys = db.list();
+        const allKeys = ensureDbReady().list();
         if (!prefix) return allKeys;
         return allKeys.filter(key => key.startsWith(prefix));
     },
@@ -145,19 +150,19 @@ export const storage = {
     /**
      * 清空所有数据
      */
-    clear: () => db.clear(),
+    clear: () => ensureDbReady().clear(),
     
     /**
      * 导出数据库
      * @returns {string} HTML格式的数据库内容
      */
-    export: () => db.export(),
+    export: () => ensureDbReady().export(),
     
     /**
      * 导入数据库
      * @param {string} htmlData - HTML格式的数据库内容
      */
-    import: (htmlData) => db.import(htmlData)
+    import: (htmlData) => ensureDbReady().import(htmlData)
 };
 
 /**

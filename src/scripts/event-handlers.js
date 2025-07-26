@@ -2,6 +2,7 @@ import { createViewer } from './viewer-manager.js';
 import { handleFileUpload } from './file-handler.js';
 import { downloadPage } from './download-utils.js';
 import { storage } from './storage.js';
+import { PanoramaVideoGenerator, saveVideoBlob } from './panorama-exporter.js';
 
 // 常用分辨率选项
 const COMMON_RESOLUTIONS = [
@@ -48,6 +49,151 @@ function showResolutionDialog(onSelect) {
     dialog.querySelector('#exportCancel').onclick = () => {
         document.body.removeChild(dialog);
     };
+}
+
+// 视频导出相关变量
+let videoGenerator = null;
+let isExporting = false;
+
+// 显示视频导出对话框
+function showVideoExportDialog() {
+    const dialog = document.getElementById('videoExportDialog');
+    dialog.style.display = 'block';
+}
+
+// 隐藏视频导出对话框
+function hideVideoExportDialog() {
+    const dialog = document.getElementById('videoExportDialog');
+    dialog.style.display = 'none';
+}
+
+// 显示导出进度
+function showExportProgress() {
+    const progress = document.getElementById('exportProgress');
+    progress.style.display = 'block';
+}
+
+// 隐藏导出进度
+function hideExportProgress() {
+    const progress = document.getElementById('exportProgress');
+    progress.style.display = 'none';
+}
+
+// 更新进度条
+function updateProgress(progressData) {
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const previewFrame = document.getElementById('previewFrame');
+    
+    const percent = Math.round(progressData.progress * 100);
+    progressBar.style.width = percent + '%';
+    progressText.textContent = `${progressData.stage} ${progressData.currentFrame}/${progressData.totalFrames} (${percent}%)`;
+    
+    if (progressData.frameImage) {
+        previewFrame.innerHTML = `<img src="${progressData.frameImage}" style="max-width: 100%; max-height: 100%;">`;
+    }
+}
+
+// 获取分辨率设置
+function getResolutionSettings() {
+    const resolution = document.getElementById('videoResolution').value;
+    const duration = parseInt(document.getElementById('videoDuration').value);
+    const fps = parseInt(document.getElementById('videoFps').value);
+    const rotations = parseFloat(document.getElementById('videoRotations').value);
+    
+    const resolutionMap = {
+        '720p': { width: 1280, height: 720 },
+        '1080p': { width: 1920, height: 1080 },
+        '2K': { width: 2560, height: 1440 },
+        '4K': { width: 3840, height: 2160 }
+    };
+    
+    return {
+        ...resolutionMap[resolution],
+        duration,
+        fps,
+        rotations
+    };
+}
+
+// 开始视频导出
+async function startVideoExport() {
+    if (isExporting) return;
+    
+    // 获取当前图片数据
+    let imageData = storage.getImage('current');
+    if (!imageData) {
+        if (window.imageData) {
+            imageData = window.imageData;
+            storage.setImage('current', imageData);
+        } else {
+            alert('没有找到可导出的图片数据');
+            return;
+        }
+    }
+    
+    const settings = getResolutionSettings();
+    
+    try {
+        isExporting = true;
+        hideVideoExportDialog();
+        showExportProgress();
+        
+        // 创建视频生成器
+        videoGenerator = new PanoramaVideoGenerator(settings.width, settings.height);
+        videoGenerator.initRenderer();
+        await videoGenerator.setupScene(imageData);
+        
+        // 设置进度回调
+        videoGenerator.setProgressCallback(updateProgress);
+        
+        // 开始录制
+        const videoBlob = await videoGenerator.startRecording({
+            duration: settings.duration,
+            fps: settings.fps,
+            rotations: settings.rotations,
+            width: settings.width,
+            height: settings.height
+        });
+        
+        // 保存视频
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        await saveVideoBlob(videoBlob, 'mp4', `panorama-video-${timestamp}`);
+        
+        // 记录导出历史
+        storage.addHistory('export_video', {
+            resolution: `${settings.width}x${settings.height}`,
+            duration: settings.duration,
+            fps: settings.fps,
+            rotations: settings.rotations,
+            timestamp: Date.now()
+        });
+        
+        alert('视频导出完成！');
+        
+    } catch (error) {
+        console.error('视频导出失败:', error);
+        alert('视频导出失败: ' + error.message);
+    } finally {
+        isExporting = false;
+        hideExportProgress();
+        
+        if (videoGenerator) {
+            videoGenerator.dispose();
+            videoGenerator = null;
+        }
+    }
+}
+
+// 取消视频导出
+function cancelVideoExport() {
+    if (videoGenerator) {
+        videoGenerator.dispose();
+        videoGenerator = null;
+    }
+    isExporting = false;
+    hideVideoExportDialog();
+    hideExportProgress();
 }
 
 // 导出压缩版页面
@@ -128,6 +274,13 @@ async function exportCompressedPage(resolution) {
         tempImageElement.src = compressed;
     }
     
+    // 在临时document中查找并更新预览图
+    const tempPreviewImage = tempDocument.querySelector('#previewImage');
+    if (tempPreviewImage) {
+        // 使用DOM操作安全地设置预览图src
+        tempPreviewImage.src = compressed;
+    }
+    
     // 获取克隆后的HTML
     const newHtml = tempDocument.documentElement.outerHTML;
     
@@ -167,6 +320,9 @@ function setupContextMenu() {
         }
         if (action === 'export-compressed') {
             showResolutionDialog(exportCompressedPage);
+        }
+        if (action === 'export-video') {
+            showVideoExportDialog();
         }
     });
 }
@@ -238,6 +394,24 @@ function setupFileInput() {
 }
 
 /**
+ * 设置视频导出对话框事件
+ */
+function setupVideoExportDialog() {
+    // 开始导出按钮
+    document.getElementById('startVideoExport').addEventListener('click', startVideoExport);
+    
+    // 取消导出按钮
+    document.getElementById('cancelVideoExport').addEventListener('click', cancelVideoExport);
+    
+    // 点击对话框外部关闭
+    document.getElementById('videoExportDialog').addEventListener('click', function(e) {
+        if (e.target === this) {
+            hideVideoExportDialog();
+        }
+    });
+}
+
+/**
  * 设置所有事件监听器
  */
 export function setupEventListeners() {
@@ -245,4 +419,5 @@ export function setupEventListeners() {
     setupDragAndDrop();
     setupPreviewContainer();
     setupFileInput();
+    setupVideoExportDialog();
 } 
