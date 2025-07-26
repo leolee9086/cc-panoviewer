@@ -88,7 +88,8 @@
         </div>
         
         <div id="previewContainer">
-            <button id="uploader">添加图片</button>
+            <img v-if="currentThumbnail" id="previewImage" :src="currentThumbnail" alt="Preview" @click="loadCurrentPanorama">
+            <button id="uploader" @click="handleUploaderClick">添加图片</button>
         </div>
     </div>
 </template>
@@ -103,7 +104,8 @@ import { createThumbnail } from './scripts/file-handler.js';
 export default {
     data() {
         return {
-            showUploadPrompt: true
+            showUploadPrompt: true,
+            currentThumbnail: null
         };
     },
     components: {
@@ -117,10 +119,7 @@ export default {
             const { imageId, base64data } = data;
             // Update preview container with thumbnail
             const thumbnailData = await createThumbnail(base64data);
-            document.getElementById('previewContainer').innerHTML = `
-                <img id="previewImage" src="${thumbnailData}" alt="Preview">
-                <button id="uploader">添加图片</button>
-            `;
+            this.currentThumbnail = thumbnailData;
 
             // Create viewer
             createViewer('panorama', {
@@ -131,6 +130,34 @@ export default {
                 "autoRotate": true,
                 "hotSpots": [] // You might want to load these from storage if available
             });
+        },
+        handleUploaderClick() {
+            // 直接触发文件选择
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = async (e) => {
+                if (e.target.files.length) {
+                    const { handleFileUpload } = await import('./scripts/file-handler.js');
+                    const result = await handleFileUpload(e.target.files);
+                    if (result) {
+                        this.hideUploadPrompt();
+                        this.loadPanorama(result);
+                    }
+                }
+            };
+            input.click();
+        },
+        loadCurrentPanorama() {
+            // 获取当前图片编号
+            const currentImageId = storage.getCurrentImage();
+            if (currentImageId) {
+                // 获取原始图片数据
+                const imageData = storage.getImage(currentImageId);
+                if (imageData) {
+                    this.loadPanorama({ imageId: currentImageId, base64data: imageData });
+                }
+            }
         },
         handleFileUploadComplete(result) {
             this.hideUploadPrompt();

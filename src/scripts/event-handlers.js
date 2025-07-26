@@ -400,33 +400,6 @@ function setupDragAndDrop() {
 function setupPreviewContainer() {
     const previewContainer = document.getElementById('previewContainer');
 
-    previewContainer.addEventListener('click', async (e) => {
-        if (e.target.src && e.target.id === 'previewImage') {
-            // Get current image ID from storage
-            const currentImageId = storage.getCurrentImage();
-            if (currentImageId) {
-                // Get original image data from DB
-                const imageData = storage.getImage(currentImageId);
-                if (imageData) {
-                    eventBus.emit('load-panorama', { imageId: currentImageId, base64data: imageData });
-                }
-            }
-        } else if (e.target === document.getElementById('uploader')) {
-            // This part is now handled by UploadPrompt.vue
-            // const input = document.createElement('input');
-            // input.type = 'file';
-            // input.accept = 'image/*';
-            // input.onchange = e => {
-            //     if (e.target.files.length) {
-            //         const file = e.target.files[0];
-            //         handleFileUpload(file);
-            //     }
-            // };
-            // input.click();
-            eventBus.emit('trigger-file-input'); // Emit event to trigger file input in Vue component
-        }
-    });
-
     previewContainer.addEventListener('contextmenu', (e) => {
         if (e.target.src) {
             e.target.remove();
