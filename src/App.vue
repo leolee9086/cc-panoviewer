@@ -4,6 +4,13 @@
         
         <UploadPrompt v-if="showUploadPrompt" @file-uploaded="handleFileUploadComplete" />
         
+        <!-- 分辨率选择对话框 -->
+        <ResolutionDialog 
+            :visible="showResolutionDialog" 
+            @confirm="handleResolutionConfirm" 
+            @cancel="handleResolutionCancel" 
+        />
+        
         <div id="contextMenu">
             <ul>
                 <li data-action="download-page">下载当前页面（含数据）</li>
@@ -98,6 +105,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import UploadPrompt from './components/UploadPrompt.vue';
+import ResolutionDialog from './components/ResolutionDialog.vue';
 import { initApp, eventBus } from './scripts/main.js';
 import { createViewer } from './scripts/viewer-manager.js';
 import { storage } from './scripts/storage.js';
@@ -107,6 +115,8 @@ import { createThumbnail } from './scripts/file-handler.js';
 const showUploadPrompt = ref(true);
 const imageList = ref([]);
 const currentImageId = ref(null);
+const showResolutionDialog = ref(false);
+const pendingResolutionCallback = ref(null);
 
 // 计算属性
 const currentImage = computed(() => {
@@ -143,36 +153,8 @@ const switchToImage = (imageId) => {
 const loadPanorama = async (data) => {
     const { imageId, base64data } = data;
     
-    // 更新预览容器，显示所有图片的缩略图
-    const thumbnailData = await createThumbnail(base64data);
-    const allThumbnails = await Promise.all(
-        imageList.value.map(async (img) => {
-            const imgData = storage.getImage(img.id);
-            if (imgData) {
-                const thumb = await createThumbnail(imgData, 100, 60);
-                return `<img src="${thumb}" alt="${img.metadata.name || '图片'}" 
-                           style="width: 80px; height: 48px; margin: 2px; cursor: pointer; border: 2px solid ${img.id === imageId ? '#007bff' : 'transparent'}; border-radius: 4px;"
-                           data-image-id="${img.id}">`;
-            }
-            return '';
-        })
-    );
-    
-    document.getElementById('previewContainer').innerHTML = `
-        <div style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; max-height: 400px; overflow-y: auto;">
-            ${allThumbnails.filter(thumb => thumb).join('')}
-        </div>
-        <button id="uploader">添加图片</button>
-    `;
-
-    // 为缩略图添加点击事件
-    const thumbnails = document.querySelectorAll('[data-image-id]');
-    thumbnails.forEach(thumb => {
-        thumb.addEventListener('click', () => {
-            const imgId = thumb.getAttribute('data-image-id');
-            switchToImage(imgId);
-        });
-    });
+    // 从DB读取图片列表并生成缩略图
+    await updateThumbnailsFromDB(imageId);
 
     // Create viewer
     createViewer('panorama', {
@@ -185,10 +167,71 @@ const loadPanorama = async (data) => {
     });
 };
 
+// 从DB读取数据更新缩略图
+const updateThumbnailsFromDB = async (currentImageId) => {
+    // 从DB获取图片列表
+    const imageListFromDB = storage.getImageList();
+    
+    // 生成所有图片的缩略图
+    const allThumbnails = await Promise.all(
+        imageListFromDB.map(async (imgId) => {
+            const imgData = storage.getImage(imgId);
+            if (imgData) {
+                const thumb = await createThumbnail(imgData, 100, 60);
+                const metadata = storage.getImageMetadata(imgId, {});
+                return `<img src="${thumb}" alt="${metadata.name || '图片'}" 
+                           style="width: 200px; height: 120px; margin: 2px; cursor: pointer; border: 2px solid ${imgId === currentImageId ? '#007bff' : 'transparent'}; border-radius: 4px;"
+                           data-image-id="${imgId}">`;
+            }
+            return '';
+        })
+    );
+    
+    // 更新预览容器
+    const previewContainer = document.getElementById('previewContainer');
+    if (previewContainer) {
+        previewContainer.innerHTML = `
+            <div style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; max-height: 400px; overflow-y: auto;">
+                ${allThumbnails.filter(thumb => thumb).join('')}
+            </div>
+            <button id="uploader">添加图片</button>
+        `;
+
+        // 为缩略图添加点击事件
+        const thumbnails = previewContainer.querySelectorAll('[data-image-id]');
+        thumbnails.forEach(thumb => {
+            thumb.addEventListener('click', () => {
+                const imgId = thumb.getAttribute('data-image-id');
+                switchToImage(imgId);
+            });
+        });
+    }
+};
+
 const handleFileUploadComplete = (result) => {
     hideUploadPrompt();
     updateImageList();
     loadPanorama(result);
+};
+
+// 分辨率对话框处理方法
+const handleResolutionConfirm = (resolution) => {
+    showResolutionDialog.value = false;
+    if (pendingResolutionCallback.value) {
+        pendingResolutionCallback.value(resolution);
+        pendingResolutionCallback.value = null;
+    }
+};
+
+const handleResolutionCancel = () => {
+    showResolutionDialog.value = false;
+    pendingResolutionCallback.value = null;
+};
+
+// 显示分辨率对话框的方法（供外部调用）
+const showResolutionDialogForExport = (callback) => {
+    pendingResolutionCallback.value = callback;
+    showResolutionDialog.value = true;
 };
 
 // 监听事件总线
@@ -242,6 +285,9 @@ onMounted(() => {
 
     // 初始化图片列表
     updateImageList();
+
+    // 暴露分辨率对话框方法到全局
+    window.showResolutionDialogForExport = showResolutionDialogForExport;
 
     // Initial panorama load from storage
     const currentImageId = storage.getCurrentImage();

@@ -32,24 +32,29 @@ function compressImage(src, width, height) {
 
 // 弹窗选择分辨率
 function showResolutionDialog(onSelect) {
-    // 获取保存的分辨率设置
-    const savedResolutionIndex = storage.getConfig('export.resolution.index', 1); // 默认2K
-    
-    const dialog = document.createElement('div');
-    dialog.style = 'position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:24px 32px;z-index:9999;border-radius:8px;box-shadow:0 2px 12px #0002;';
-    dialog.innerHTML = `<div style="margin-bottom:12px;">选择导出分辨率：</div><select id="exportResolution">${COMMON_RESOLUTIONS.map((r,i)=>`<option value="${i}" ${i === savedResolutionIndex ? 'selected' : ''}>${r.label}</option>`).join('')}</select><br><br><button id="exportConfirm">确定</button> <button id="exportCancel">取消</button>`;
-    document.body.appendChild(dialog);
-    dialog.querySelector('#exportConfirm').onclick = () => {
-        const idx = parseInt(dialog.querySelector('#exportResolution').value);
-        document.body.removeChild(dialog);
-        // 保存用户选择
-        storage.setConfig('export.resolution.index', idx);
-        storage.setConfig('export.resolution', COMMON_RESOLUTIONS[idx].label);
-        onSelect(COMMON_RESOLUTIONS[idx]);
-    };
-    dialog.querySelector('#exportCancel').onclick = () => {
-        document.body.removeChild(dialog);
-    };
+    // 使用Vue组件显示分辨率对话框
+    if (window.showResolutionDialogForExport) {
+        window.showResolutionDialogForExport(onSelect);
+    } else {
+        // 回退到原来的DOM操作方式
+        const savedResolutionIndex = storage.getConfig('export.resolution.index', 1); // 默认2K
+        
+        const dialog = document.createElement('div');
+        dialog.style = 'position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:24px 32px;z-index:9999;border-radius:8px;box-shadow:0 2px 12px #0002;';
+        dialog.innerHTML = `<div style="margin-bottom:12px;">选择导出分辨率：</div><select id="exportResolution">${COMMON_RESOLUTIONS.map((r,i)=>`<option value="${i}" ${i === savedResolutionIndex ? 'selected' : ''}>${r.label}</option>`).join('')}</select><br><br><button id="exportConfirm">确定</button> <button id="exportCancel">取消</button>`;
+        document.body.appendChild(dialog);
+        dialog.querySelector('#exportConfirm').onclick = () => {
+            const idx = parseInt(dialog.querySelector('#exportResolution').value);
+            document.body.removeChild(dialog);
+            // 保存用户选择
+            storage.setConfig('export.resolution.index', idx);
+            storage.setConfig('export.resolution', COMMON_RESOLUTIONS[idx].label);
+            onSelect(COMMON_RESOLUTIONS[idx]);
+        };
+        dialog.querySelector('#exportCancel').onclick = () => {
+            document.body.removeChild(dialog);
+        };
+    }
 }
 
 // 视频导出相关变量
@@ -78,6 +83,106 @@ function showExportProgress() {
 function hideExportProgress() {
     const progress = document.getElementById('exportProgress');
     progress.style.display = 'none';
+}
+
+/**
+ * 显示压缩进度对话框
+ */
+function showCompressionProgress() {
+    // 创建压缩进度对话框
+    const compressionDialog = document.createElement('div');
+    compressionDialog.id = 'compressionProgress';
+    compressionDialog.style.cssText = `
+        position: fixed; 
+        top: 0; 
+        left: 0; 
+        width: 100%; 
+        height: 100%; 
+        background: rgba(0,0,0,0.8); 
+        z-index: 1002;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    compressionDialog.innerHTML = `
+        <div style="
+            background: white; 
+            padding: 30px; 
+            border-radius: 10px; 
+            min-width: 400px; 
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        ">
+            <h3 style="margin: 0 0 20px 0; color: #333;">正在压缩页面...</h3>
+            <div style="margin: 20px 0;">
+                <div style="
+                    width: 100%; 
+                    height: 20px; 
+                    background: #f0f0f0; 
+                    border-radius: 10px; 
+                    overflow: hidden;
+                    margin-bottom: 10px;
+                ">
+                    <div id="compressionProgressBar" style="
+                        width: 0%; 
+                        height: 100%; 
+                        background: linear-gradient(90deg, #007bff, #0056b3); 
+                        transition: width 0.3s;
+                    "></div>
+                </div>
+                <div id="compressionProgressText" style="
+                    margin-top: 10px; 
+                    color: #666; 
+                    font-size: 14px;
+                ">准备中...</div>
+            </div>
+            <div style="
+                margin-top: 20px; 
+                padding: 15px; 
+                background: #f8f9fa; 
+                border-radius: 5px; 
+                font-size: 12px; 
+                color: #666;
+            ">
+                <div>压缩过程包括：</div>
+                <div>1. 图片压缩处理</div>
+                <div>2. 页面模板准备</div>
+                <div>3. 数据整合</div>
+                <div>4. 文件生成下载</div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(compressionDialog);
+}
+
+/**
+ * 更新压缩进度
+ * @param {string} text - 进度文本
+ * @param {number} percentage - 进度百分比 (0-100)
+ */
+function updateCompressionProgress(text, percentage) {
+    const progressBar = document.getElementById('compressionProgressBar');
+    const progressText = document.getElementById('compressionProgressText');
+    
+    if (progressBar) {
+        progressBar.style.width = percentage + '%';
+    }
+    
+    if (progressText) {
+        progressText.textContent = text;
+    }
+}
+
+/**
+ * 隐藏压缩进度对话框
+ */
+function hideCompressionProgress() {
+    const compressionDialog = document.getElementById('compressionProgress');
+    if (compressionDialog) {
+        document.body.removeChild(compressionDialog);
+    }
 }
 
 // 更新进度条
@@ -223,65 +328,86 @@ async function exportCompressedPage(resolution) {
         timestamp: Date.now()
     });
     
-    // 临时生成压缩图（不写入DB）
-    const targetW = resolution.width, targetH = resolution.height;
-    const compressed = await compressImage(src, targetW, targetH);
+    // 显示压缩进度对话框
+    showCompressionProgress();
     
-    // 使用干净的document克隆作为蓝本
-    const sourceDocument = getCleanDocumentClone();
-    if (!sourceDocument) {
-        throw new Error('干净的document克隆未初始化，无法进行压缩页面导出');
-    }
-    const tempDocument = sourceDocument.cloneNode(true);
-    
-    // 在临时document中创建新的DocumentDB实例
-    const tempDb = new DocumentDB(tempDocument, 'cc-panoviewer-db');
-    
-    // 直接用压缩后的图片数据替换原来的图片数据
-    tempDb.set(`image.${currentImageId}`, compressed, { type: 'base64' });
-    
-    // 清理其他不需要的数据，只保留压缩图片
-    const allKeys = tempDb.list();
-    allKeys.forEach(key => {
-        if (!key.startsWith('image.') && key !== 'currentImage') {
-            tempDb.delete(key);
+    try {
+        // 临时生成压缩图（不写入DB）
+        const targetW = resolution.width, targetH = resolution.height;
+        
+        // 更新进度信息
+        updateCompressionProgress('正在压缩图片...', 25);
+        
+        const compressed = await compressImage(src, targetW, targetH);
+        
+        // 更新进度信息
+        updateCompressionProgress('正在准备页面模板...', 50);
+        
+        // 使用干净的document克隆作为蓝本
+        const sourceDocument = getCleanDocumentClone();
+        if (!sourceDocument) {
+            throw new Error('干净的document克隆未初始化，无法进行压缩页面导出');
         }
-    });
-    
-    // 在临时document中查找并更新script标签
-    const tempScriptElement = tempDocument.querySelector('.images');
-    if (tempScriptElement) {
-        // 使用DOM操作安全地写入压缩后的base64数据
-        tempScriptElement.textContent = 'window.imageData = "' + compressed + '";';
+        const tempDocument = sourceDocument.cloneNode(true);
+        
+        // 更新进度信息
+        updateCompressionProgress('正在处理图片数据...', 75);
+        
+        // 在临时document中创建新的DocumentDB实例
+        const tempDb = new DocumentDB(tempDocument, 'cc-panoviewer-db');
+        
+        // 清理临时document中的所有现有数据
+        tempDb.clear();
+        
+        // 将压缩后的图片数据存储到DocumentDB中
+        tempDb.set(`image.${currentImageId}`, compressed, { type: 'base64' });
+        
+        // 设置当前图片ID
+        tempDb.set('currentImage', currentImageId);
+        
+        // 添加图片到列表
+        const imageList = [currentImageId];
+        tempDb.set('imageList', imageList);
+        
+        // 设置图片元数据（如果有的话）
+        const originalMetadata = storage.getImageMetadata(currentImageId);
+        if (originalMetadata) {
+            tempDb.set(`image.${currentImageId}.metadata`, originalMetadata);
+        }
+        
+        // 更新进度信息
+        updateCompressionProgress('正在生成下载文件...', 90);
+        
+        // 获取克隆后的HTML
+        const newHtml = tempDocument.documentElement.outerHTML;
+        
+        // 更新进度信息
+        updateCompressionProgress('正在下载文件...', 100);
+        
+        // 下载
+        const blob = new Blob([newHtml], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `panoviewer_compressed_${targetW}x${targetH}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        // 隐藏进度对话框
+        hideCompressionProgress();
+        
+        // 显示成功消息
+        setTimeout(() => {
+            alert(`压缩页面导出成功！\n分辨率: ${targetW}x${targetH}\n文件大小: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+        }, 500);
+        
+    } catch (error) {
+        hideCompressionProgress();
+        alert('压缩页面导出失败: ' + error.message);
+        console.error('压缩页面导出错误:', error);
     }
-    
-    // 在临时document中查找并更新缩略图
-    const tempImageElement = tempDocument.querySelector('#image1');
-    if (tempImageElement) {
-        // 使用DOM操作安全地设置缩略图src
-        tempImageElement.src = compressed;
-    }
-    
-    // 在临时document中查找并更新预览图
-    const tempPreviewImage = tempDocument.querySelector('#previewImage');
-    if (tempPreviewImage) {
-        // 使用DOM操作安全地设置预览图src
-        tempPreviewImage.src = compressed;
-    }
-    
-    // 获取克隆后的HTML
-    const newHtml = tempDocument.documentElement.outerHTML;
-    
-    // 下载
-    const blob = new Blob([newHtml], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `panoviewer_compressed_${targetW}x${targetH}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
 }
 
 /**
