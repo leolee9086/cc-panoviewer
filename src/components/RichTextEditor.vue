@@ -567,8 +567,8 @@ const jumpToAngle = (angleLink) => {
   background: rgba(255, 255, 255, 0.116);
   backdrop-filter: blur(10px);
   min-height: 120px;
-  height: 100%;
-  width: 100%;
+  height: calc(100% - 40px);
+  width: calc(100% - 40px);
   max-width: 100%;
   line-height: 1.8;
   transition: all 0.3s ease;
