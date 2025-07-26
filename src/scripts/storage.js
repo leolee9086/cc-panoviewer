@@ -203,6 +203,36 @@ export const storage = {
     getViewer: (key, defaultValue = null) => ensureDbReady().get(`viewer.${key}`, defaultValue),
     
     /**
+     * 设置介绍文字内容
+     * @param {string} imageId - 图片唯一ID
+     * @param {string} content - 介绍文字内容
+     */
+    setIntroductionContent: (imageId, content) => ensureDbReady().set(`introduction.${imageId}`, content),
+    
+    /**
+     * 获取介绍文字内容
+     * @param {string} imageId - 图片唯一ID
+     * @param {string} defaultValue - 默认值
+     * @returns {string} 介绍文字内容
+     */
+    getIntroductionContent: (imageId, defaultValue = '') => ensureDbReady().get(`introduction.${imageId}`, defaultValue),
+    
+    /**
+     * 设置角度链接列表
+     * @param {string} imageId - 图片唯一ID
+     * @param {Array} angleLinks - 角度链接列表
+     */
+    setAngleLinks: (imageId, angleLinks) => ensureDbReady().set(`angleLinks.${imageId}`, angleLinks),
+    
+    /**
+     * 获取角度链接列表
+     * @param {string} imageId - 图片唯一ID
+     * @param {Array} defaultValue - 默认值
+     * @returns {Array} 角度链接列表
+     */
+    getAngleLinks: (imageId, defaultValue = []) => ensureDbReady().get(`angleLinks.${imageId}`, defaultValue),
+    
+    /**
      * 添加操作历史记录
      * @param {string} action - 操作类型
      * @param {any} data - 操作数据

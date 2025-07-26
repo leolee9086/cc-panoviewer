@@ -41,7 +41,8 @@ export default defineConfig(({ mode }) => {
           assetFileNames: 'assets/[name].[ext]',
           entryFileNames: 'assets/[name].js',
           chunkFileNames: 'assets/[name].js'
-        }
+        },
+        external: isSingleMode ? [] : ['vditor']
       }
     },
     plugins: isSingleMode ? [
@@ -95,6 +96,30 @@ export default defineConfig(({ mode }) => {
               }
             } catch (error) {
               console.warn('内联Pannellum库时出错:', error);
+            }
+
+            // 内联Vditor相关资源
+            try {
+              // 查找并内联Vditor的CSS文件
+              Object.values(bundle).forEach(asset => {
+                if (asset.type === 'asset' && asset.fileName.includes('vditor') && asset.fileName.endsWith('.css')) {
+                  const cssContent = asset.source;
+                  const cssFileName = asset.fileName.split('/').pop();
+                  $(`link[href*="${cssFileName}"]`).each((_, el) => {
+                    $(el).replaceWith(`<style>${cssContent}</style>`);
+                  });
+                }
+              });
+              
+              // 手动内联Vditor的CSS文件
+              const vditorCssPath = join(__dirname, 'node_modules/vditor/dist/index.css');
+              if (existsSync(vditorCssPath)) {
+                const vditorCss = readFileSync(vditorCssPath, 'utf-8');
+                // 在head中添加Vditor的CSS
+                $('head').append(`<style>${vditorCss}</style>`);
+              }
+            } catch (error) {
+              console.warn('内联Vditor资源时出错:', error);
             }
 
             // 移除所有未被内联的外链JS/CSS

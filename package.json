@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "three": "^0.162.0",
+    "vditor": "^3.11.1",
     "vue": "^3.4.31"
   },
   "devDependencies": {

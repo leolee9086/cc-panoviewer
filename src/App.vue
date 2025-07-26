@@ -121,12 +121,12 @@
             </script>
         </div>
         
-        <div id="cc-right" contenteditable="true">
-            这是一个"自包含"的全景图查看器,简单封装了<a href="https://pannellum.org/">pannellum</a>的接口,你可以使用它自由地查看你的各种全景图,
-            右键可以下载包含你的全景图的网页内容（可能有点大，这个网页不会压缩你的全景图），你的图片只会存在网页本身中不会被上传到任何地方
-            代码本身遵循AGPL-3.0-or-later协议,你可以随意再次分发并修改它,只需要保持修改之后的结果仍然遵守同样的协议即可,这段代码脚本注本身也是可以编辑的,
-            你可以改成你自己喜欢的内容。
-        </div>
+        <!-- 富文本编辑器组件 -->
+        <RichTextEditor 
+            :current-image-id="currentImageId"
+            :image-list="imageList"
+            @content-changed="handleIntroductionContentChanged"
+        />
         
         <div id="cc-bottom" contenteditable="false">
             如果你喜欢这个小工具可以去<a href="https://ifdian.net/a/leolee9086">我们的爱发电</a> 请我们喝一杯咖啡
@@ -154,6 +154,7 @@ import { ref, onMounted, computed, nextTick } from 'vue';
 import UploadPrompt from './components/UploadPrompt.vue';
 import ResolutionDialog from './components/ResolutionDialog.vue';
 import ExportDialog from './components/ExportDialog.vue';
+import RichTextEditor from './components/RichTextEditor.vue';
 import { initApp, eventBus } from './scripts/main.js';
 import { createViewer } from './scripts/viewer-manager.js';
 import { storage } from './scripts/storage.js';
@@ -353,6 +354,13 @@ const handleExportDialogClose = () => {
 const handleExportComplete = () => {
     showExportDialog.value = false;
     showMessageToast('导出完成！', 'success');
+};
+
+// 处理介绍文字变化
+const handleIntroductionContentChanged = (content) => {
+    // 介绍文字内容已通过storage自动保存
+    // 这里可以添加额外的处理逻辑，比如更新导出数据等
+    console.log('介绍文字已更新:', content);
 };
 
 // 显示分辨率对话框的方法（供外部调用）

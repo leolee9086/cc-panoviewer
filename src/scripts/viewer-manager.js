@@ -19,6 +19,9 @@ export function createViewer(containerId, config) {
     
     const viewer = pannellum.viewer(containerId, config);
     
+    // 将viewer实例保存到全局变量，以便其他组件访问
+    window.pannellumViewer = viewer;
+    
     // 保存查看器状态
     storage.setViewer('state', {
         containerId,
@@ -27,6 +30,14 @@ export function createViewer(containerId, config) {
     });
     
     return viewer;
+}
+
+/**
+ * 获取当前viewer实例
+ * @returns {Object|null} 查看器实例
+ */
+export function getCurrentViewer() {
+    return window.pannellumViewer || null;
 }
 
 /**
