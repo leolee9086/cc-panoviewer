@@ -1,6 +1,7 @@
 /**
  * @织: DocumentDB - XML风格的HTML页面数据库
  * data-属性用于存储meta信息，元素内容用于存储实际数据（如JSON/base64等）
+ * 支持事务性操作，使用最轻量的DOM元素优化性能
  */
 export class DocumentDB {
     /**
@@ -10,10 +11,65 @@ export class DocumentDB {
     constructor(document, rootSelector = '#document-db') {
         this.document = document;
         this.root = this.getOrCreateRoot(rootSelector);
+        this.transactionStack = [];
+        this.isInTransaction = false;
     }
 
     /**
-     * 设置数据
+     * 开始事务
+     * @returns {string} 事务ID
+     */
+    beginTransaction() {
+        const transactionId = `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const transaction = {
+            id: transactionId,
+            operations: [],
+            snapshot: this.createSnapshot(),
+            startTime: Date.now()
+        };
+        this.transactionStack.push(transaction);
+        this.isInTransaction = true;
+        return transactionId;
+    }
+
+    /**
+     * 提交事务
+     * @param {string} transactionId - 事务ID
+     * @returns {boolean} 是否成功
+     */
+    commitTransaction(transactionId) {
+        const transaction = this.findTransaction(transactionId);
+        if (!transaction) return false;
+
+        // 执行所有操作
+        for (const operation of transaction.operations) {
+            this.executeOperation(operation);
+        }
+
+        // 移除事务
+        this.removeTransaction(transactionId);
+        return true;
+    }
+
+    /**
+     * 回滚事务
+     * @param {string} transactionId - 事务ID
+     * @returns {boolean} 是否成功
+     */
+    rollbackTransaction(transactionId) {
+        const transaction = this.findTransaction(transactionId);
+        if (!transaction) return false;
+
+        // 恢复快照
+        this.restoreSnapshot(transaction.snapshot);
+
+        // 移除事务
+        this.removeTransaction(transactionId);
+        return true;
+    }
+
+    /**
+     * 设置数据（支持事务）
      * @param {string} key
      * @param {any} value
      * @param {object} options
@@ -21,14 +77,22 @@ export class DocumentDB {
     set(key, value, options = {}) {
         const { type = 'auto', version = '1.0', ...meta } = options;
         const detectedType = type === 'auto' ? this.detectType(value) : type;
-        const element = this.getOrCreateElement(key);
-        element.setAttribute('data-type', detectedType);
-        element.setAttribute('data-version', version);
-        element.setAttribute('data-created', new Date().toISOString());
-        Object.entries(meta).forEach(([k, v]) => {
-            element.setAttribute(`data-${k}`, v);
-        });
-        this.setElementContent(element, value, detectedType);
+        
+        if (this.isInTransaction) {
+            // 在事务中，记录操作但不立即执行
+            const currentTransaction = this.transactionStack[this.transactionStack.length - 1];
+            currentTransaction.operations.push({
+                type: 'set',
+                key,
+                value,
+                detectedType,
+                version,
+                meta
+            });
+        } else {
+            // 直接执行
+            this.executeSet(key, value, detectedType, version, meta);
+        }
     }
 
     /**
@@ -45,12 +109,21 @@ export class DocumentDB {
     }
 
     /**
-     * 删除数据
+     * 删除数据（支持事务）
      * @param {string} key
      */
     delete(key) {
-        const element = this.root.querySelector(`[data-key="${key}"]`);
-        if (element) element.remove();
+        if (this.isInTransaction) {
+            // 在事务中，记录操作但不立即执行
+            const currentTransaction = this.transactionStack[this.transactionStack.length - 1];
+            currentTransaction.operations.push({
+                type: 'delete',
+                key
+            });
+        } else {
+            // 直接执行
+            this.executeDelete(key);
+        }
     }
 
     /**
@@ -70,11 +143,19 @@ export class DocumentDB {
     }
 
     /**
-     * 清空所有数据
+     * 清空所有数据（支持事务）
      */
     clear() {
-        const elements = this.root.querySelectorAll('[data-key]');
-        elements.forEach(el => el.remove());
+        if (this.isInTransaction) {
+            // 在事务中，记录操作但不立即执行
+            const currentTransaction = this.transactionStack[this.transactionStack.length - 1];
+            currentTransaction.operations.push({
+                type: 'clear'
+            });
+        } else {
+            // 直接执行
+            this.executeClear();
+        }
     }
 
     /**
@@ -83,6 +164,57 @@ export class DocumentDB {
     export() {
         return this.root.outerHTML;
     }
+
+    /**
+     * 导出完整文档（返回包含数据库的完整HTML文档）
+     * 只用DOM API，不用字符串拼接和formatHTML
+     * @param {object} options - 导出选项
+     * @param {string} options.title - 文档标题
+     * @param {string} options.charset - 字符编码
+     * @param {boolean} options.pretty - 是否格式化输出（忽略，始终结构化）
+     */
+    exportDocument(options = {}) {
+        const {
+            title = 'DocumentDB Export',
+            charset = 'UTF-8',
+        } = options;
+
+        // 创建新文档
+        const newDoc = document.implementation.createHTMLDocument(title);
+        // 设置charset
+        let metaCharset = newDoc.querySelector('meta[charset]');
+        if (!metaCharset) {
+            metaCharset = newDoc.createElement('meta');
+            metaCharset.setAttribute('charset', charset);
+            newDoc.head.insertBefore(metaCharset, newDoc.head.firstChild);
+        } else {
+            metaCharset.setAttribute('charset', charset);
+        }
+        // 设置title
+        newDoc.title = title;
+        // 添加样式
+        const style = newDoc.createElement('style');
+        style.textContent = `
+#document-db { display: none !important; }
+#document-db [data-key] { display: none !important; }
+`;
+        newDoc.head.appendChild(style);
+        // 复制body内容
+        newDoc.body.innerHTML = this.document.body.innerHTML;
+        // 确保数据库元素存在且不可见
+        let dbRoot = newDoc.querySelector('#document-db');
+        if (!dbRoot) {
+            dbRoot = newDoc.createElement('span');
+            dbRoot.id = 'document-db';
+            dbRoot.style.display = 'none';
+            newDoc.body.appendChild(dbRoot);
+        }
+        // 用当前数据库内容覆盖
+        dbRoot.innerHTML = this.root.innerHTML;
+        // 返回完整HTML（含DOCTYPE）
+        return '<!DOCTYPE html>\n' + newDoc.documentElement.outerHTML;
+    }
+
 
     /**
      * 导入数据库（用新HTML替换根元素内容）
@@ -112,14 +244,77 @@ export class DocumentDB {
         return new DocumentDB(newDocument);
     }
 
-    // 私有方法
+    /**
+     * 获取事务状态
+     */
+    getTransactionStatus() {
+        return {
+            isInTransaction: this.isInTransaction,
+            activeTransactions: this.transactionStack.length,
+            transactionIds: this.transactionStack.map(tx => tx.id)
+        };
+    }
+
+    // 私有方法 - 事务相关
+    findTransaction(transactionId) {
+        return this.transactionStack.find(tx => tx.id === transactionId);
+    }
+
+    removeTransaction(transactionId) {
+        const index = this.transactionStack.findIndex(tx => tx.id === transactionId);
+        if (index !== -1) {
+            this.transactionStack.splice(index, 1);
+            this.isInTransaction = this.transactionStack.length > 0;
+        }
+    }
+
+    createSnapshot() {
+        const snapshot = {};
+        const elements = this.root.querySelectorAll('[data-key]');
+        elements.forEach(element => {
+            const key = element.getAttribute('data-key');
+            const type = element.getAttribute('data-type');
+            const content = element.textContent.trim();
+            const value = this.parseElementContent(content, type);
+            snapshot[key] = { value, type };
+        });
+        return snapshot;
+    }
+
+    restoreSnapshot(snapshot) {
+        this.executeClear();
+        Object.entries(snapshot).forEach(([key, { value, type }]) => {
+            this.executeSet(key, value, type, '1.0', {});
+        });
+    }
+
+    executeOperation(operation) {
+        switch (operation.type) {
+            case 'set':
+                this.executeSet(operation.key, operation.value, operation.detectedType, operation.version, operation.meta);
+                break;
+            case 'delete':
+                this.executeDelete(operation.key);
+                break;
+            case 'clear':
+                this.executeClear();
+                break;
+        }
+    }
+
+    // 私有方法 - 优化的DOM操作
     getOrCreateRoot(selector) {
         let root = this.document.querySelector(selector);
         if (!root) {
-            root = this.document.createElement('div');
+            // 使用更轻量的span元素而不是div
+            root = this.document.createElement('span');
             root.id = 'document-db';
+            // 使用display: none完全避免回流和重绘
             root.style.display = 'none';
-            this.document.body.appendChild(root);
+            // 使用DocumentFragment减少重绘
+            const fragment = this.document.createDocumentFragment();
+            fragment.appendChild(root);
+            this.document.body.appendChild(fragment);
         }
         return root;
     }
@@ -127,11 +322,54 @@ export class DocumentDB {
     getOrCreateElement(key) {
         let element = this.root.querySelector(`[data-key="${key}"]`);
         if (!element) {
-            element = this.document.createElement('div');
+            // 使用更轻量的span元素而不是div
+            element = this.document.createElement('span');
             element.setAttribute('data-key', key);
+            // 设置display: none避免回流和重绘
+            element.style.display = 'none';
+            // 批量DOM操作，减少重绘
             this.root.appendChild(element);
         }
         return element;
+    }
+
+    executeSet(key, value, detectedType, version, meta) {
+        const element = this.getOrCreateElement(key);
+        
+        // 批量设置属性，减少DOM操作
+        const attributes = {
+            'data-type': detectedType,
+            'data-version': version,
+            'data-created': new Date().toISOString()
+        };
+        
+        // 添加meta属性
+        Object.entries(meta).forEach(([k, v]) => {
+            attributes[`data-${k}`] = v;
+        });
+
+        // 一次性设置所有属性
+        Object.entries(attributes).forEach(([attr, value]) => {
+            element.setAttribute(attr, value);
+        });
+
+        this.setElementContent(element, value, detectedType);
+    }
+
+    executeDelete(key) {
+        const element = this.root.querySelector(`[data-key="${key}"]`);
+        if (element) element.remove();
+    }
+
+    executeClear() {
+        // 使用更高效的方式清空
+        const elements = this.root.querySelectorAll('[data-key]');
+        if (elements.length > 0) {
+            // 批量移除，减少重绘
+            const fragment = this.document.createDocumentFragment();
+            elements.forEach(el => fragment.appendChild(el));
+            // fragment被丢弃时元素自动从DOM中移除
+        }
     }
 
     detectType(value) {
@@ -148,23 +386,29 @@ export class DocumentDB {
     }
 
     setElementContent(element, value, type) {
+        let content = '';
         switch (type) {
             case 'json':
-                element.textContent = JSON.stringify(value);
+                content = JSON.stringify(value);
                 break;
             case 'base64':
             case 'string':
-                element.textContent = value;
+                content = value;
                 break;
             case 'number':
             case 'boolean':
-                element.textContent = String(value);
+                content = String(value);
                 break;
             case 'null':
-                element.textContent = '';
+                content = '';
                 break;
             default:
-                element.textContent = JSON.stringify(value);
+                content = JSON.stringify(value);
+        }
+        
+        // 避免不必要的textContent设置
+        if (element.textContent !== content) {
+            element.textContent = content;
         }
     }
 
