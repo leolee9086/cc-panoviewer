@@ -87,82 +87,172 @@
             感谢pannellum的作者,推荐使用<a href="https://b3log.org/siyuan/">思源笔记</a>，这个网页本身就是使用思源支持后台服务的。
         </div>
         
+
+        
         <div id="previewContainer">
             <button id="uploader">添加图片</button>
         </div>
     </div>
 </template>
 
-<script>
+<script setup>
+import { ref, onMounted, computed } from 'vue';
 import UploadPrompt from './components/UploadPrompt.vue';
 import { initApp, eventBus } from './scripts/main.js';
 import { createViewer } from './scripts/viewer-manager.js';
 import { storage } from './scripts/storage.js';
 import { createThumbnail } from './scripts/file-handler.js';
 
-export default {
-    data() {
-        return {
-            showUploadPrompt: true
-        };
-    },
-    components: {
-        UploadPrompt
-    },
-    methods: {
-        hideUploadPrompt() {
-            this.showUploadPrompt = false;
-        },
-        async loadPanorama(data) {
-            const { imageId, base64data } = data;
-            // Update preview container with thumbnail
-            const thumbnailData = await createThumbnail(base64data);
-            document.getElementById('previewContainer').innerHTML = `
-                <img id="previewImage" src="${thumbnailData}" alt="Preview">
-                <button id="uploader">添加图片</button>
-            `;
+// 响应式数据
+const showUploadPrompt = ref(true);
+const imageList = ref([]);
+const currentImageId = ref(null);
 
-            // Create viewer
-            createViewer('panorama', {
-                "type": "equirectangular",
-                "panorama": base64data,
-                "autoLoad": true,
-                "showControls": true,
-                "autoRotate": true,
-                "hotSpots": [] // You might want to load these from storage if available
-            });
-        },
-        handleFileUploadComplete(result) {
-            this.hideUploadPrompt();
-            this.loadPanorama(result);
+// 计算属性
+const currentImage = computed(() => {
+    return imageList.value.find(img => img.id === currentImageId.value);
+});
+
+// 方法
+const hideUploadPrompt = () => {
+    showUploadPrompt.value = false;
+};
+
+const formatFileSize = (bytes) => {
+    if (!bytes) return '';
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+};
+
+const updateImageList = () => {
+    imageList.value = storage.getImageListDetails();
+    currentImageId.value = storage.getCurrentImage();
+};
+
+const switchToImage = (imageId) => {
+    if (storage.switchToImage(imageId)) {
+        currentImageId.value = imageId;
+        const imageData = storage.getImage(imageId);
+        if (imageData) {
+            loadPanorama({ imageId, base64data: imageData });
         }
-    },
-    mounted() {
-        console.log("APP加载成功");
-        initApp(); // This initApp is from main.js, which handles global setup.
-
-        // Initial panorama load from storage
-        const currentImageId = storage.getCurrentImage();
-        if (currentImageId) {
-            const imageData = storage.getImage(currentImageId);
-            if (imageData) {
-                this.hideUploadPrompt(); // Hide prompt if an image is loaded
-                this.loadPanorama({ imageId: currentImageId, base64data: imageData });
-            }
-        }
-
-        // Listen for events from eventBus
-        eventBus.on('file-dropped', (data) => {
-            this.hideUploadPrompt();
-            this.loadPanorama(data);
-        });
-
-        eventBus.on('load-panorama', (data) => {
-            this.hideUploadPrompt();
-            this.loadPanorama(data);
-        });
     }
 };
+
+const loadPanorama = async (data) => {
+    const { imageId, base64data } = data;
+    
+    // 更新预览容器，显示所有图片的缩略图
+    const thumbnailData = await createThumbnail(base64data);
+    const allThumbnails = await Promise.all(
+        imageList.value.map(async (img) => {
+            const imgData = storage.getImage(img.id);
+            if (imgData) {
+                const thumb = await createThumbnail(imgData, 100, 60);
+                return `<img src="${thumb}" alt="${img.metadata.name || '图片'}" 
+                           style="width: 80px; height: 48px; margin: 2px; cursor: pointer; border: 2px solid ${img.id === imageId ? '#007bff' : 'transparent'}; border-radius: 4px;"
+                           data-image-id="${img.id}">`;
+            }
+            return '';
+        })
+    );
+    
+    document.getElementById('previewContainer').innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; max-height: 400px; overflow-y: auto;">
+            ${allThumbnails.filter(thumb => thumb).join('')}
+        </div>
+        <button id="uploader">添加图片</button>
+    `;
+
+    // 为缩略图添加点击事件
+    const thumbnails = document.querySelectorAll('[data-image-id]');
+    thumbnails.forEach(thumb => {
+        thumb.addEventListener('click', () => {
+            const imgId = thumb.getAttribute('data-image-id');
+            switchToImage(imgId);
+        });
+    });
+
+    // Create viewer
+    createViewer('panorama', {
+        "type": "equirectangular",
+        "panorama": base64data,
+        "autoLoad": true,
+        "showControls": true,
+        "autoRotate": true,
+        "hotSpots": [] // You might want to load these from storage if available
+    });
+};
+
+const handleFileUploadComplete = (result) => {
+    hideUploadPrompt();
+    updateImageList();
+    loadPanorama(result);
+};
+
+// 监听事件总线
+const setupEventListeners = () => {
+    eventBus.on('file-dropped', (data) => {
+        hideUploadPrompt();
+        updateImageList();
+        loadPanorama(data);
+    });
+
+    eventBus.on('load-panorama', (data) => {
+        hideUploadPrompt();
+        updateImageList();
+        loadPanorama(data);
+    });
+
+    // 监听trigger-file-input事件，用于触发文件选择
+    eventBus.on('trigger-file-input', () => {
+        // 创建一个隐藏的文件输入元素
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*,.html';
+        input.style.display = 'none';
+        
+        input.onchange = async (e) => {
+            if (e.target.files.length) {
+                const { handleFileUpload } = await import('./scripts/file-handler.js');
+                const result = await handleFileUpload(e.target.files);
+                if (result) {
+                    hideUploadPrompt();
+                    updateImageList();
+                    loadPanorama(result);
+                }
+            }
+            // 清理DOM
+            document.body.removeChild(input);
+        };
+        
+        document.body.appendChild(input);
+        input.click();
+    });
+};
+
+// 生命周期
+onMounted(() => {
+    console.log("APP加载成功");
+    initApp(); // This initApp is from main.js, which handles global setup.
+
+    // 设置事件监听器
+    setupEventListeners();
+
+    // 初始化图片列表
+    updateImageList();
+
+    // Initial panorama load from storage
+    const currentImageId = storage.getCurrentImage();
+    if (currentImageId) {
+        const imageData = storage.getImage(currentImageId);
+        if (imageData) {
+            hideUploadPrompt(); // Hide prompt if an image is loaded
+            loadPanorama({ imageId: currentImageId, base64data: imageData });
+        }
+    }
+});
 </script>
 
 <style>

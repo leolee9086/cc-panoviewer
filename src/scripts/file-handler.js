@@ -115,6 +115,8 @@ async function handleImageFile(file) {
                 storage.setImage(imageId, base64data);
                 storage.setImageMetadata(imageId, metadata);
                 storage.setCurrentImage(imageId);
+                // 添加到图片列表
+                storage.addImageToList(imageId, metadata);
                 const history = storage.getFile('uploadHistory', []);
                 history.push(metadata);
                 storage.setFile('uploadHistory', history);

@@ -7,24 +7,23 @@
     </div>
 </template>
 
-<script>
+<script setup>
 import { handleFileUpload } from '../scripts/file-handler.js';
 
-export default {
-    name: 'UploadPrompt',
-    emits: ['file-uploaded'], // 声明发出的事件
-    methods: {
-        triggerFileInput() {
-            document.getElementById('fileInput').click();
-        },
-        async handleFileChange(event) {
-            const result = await handleFileUpload(event.target.files);
-            if (result) {
-                this.$emit('file-uploaded', result); // 文件处理完成后发出事件，并传递结果
-            }
-        }
+// 定义emit
+const emit = defineEmits(['file-uploaded']);
+
+// 方法
+const triggerFileInput = () => {
+    document.getElementById('fileInput').click();
+};
+
+const handleFileChange = async (event) => {
+    const result = await handleFileUpload(event.target.files);
+    if (result) {
+        emit('file-uploaded', result); // 文件处理完成后发出事件，并传递结果
     }
-}
+};
 </script>
 
 <style scoped>

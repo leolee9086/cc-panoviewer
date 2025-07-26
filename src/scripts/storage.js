@@ -66,6 +66,98 @@ export const storage = {
     getCurrentImage: (defaultValue = null) => ensureDbReady().get('currentImage', defaultValue),
     
     /**
+     * 添加图片到列表
+     * @param {string} imageId - 图片唯一ID
+     * @param {Object} metadata - 图片元数据
+     */
+    addImageToList: (imageId, metadata = {}) => {
+        const imageList = ensureDbReady().get('imageList', []);
+        if (!imageList.includes(imageId)) {
+            imageList.push(imageId);
+            ensureDbReady().set('imageList', imageList);
+        }
+        if (Object.keys(metadata).length > 0) {
+            storage.setImageMetadata(imageId, metadata);
+        }
+    },
+    
+    /**
+     * 从列表中移除图片
+     * @param {string} imageId - 图片唯一ID
+     */
+    removeImageFromList: (imageId) => {
+        const imageList = ensureDbReady().get('imageList', []);
+        const index = imageList.indexOf(imageId);
+        if (index > -1) {
+            imageList.splice(index, 1);
+            ensureDbReady().set('imageList', imageList);
+            // 删除图片数据和元数据
+            ensureDbReady().delete(`image.${imageId}`);
+            ensureDbReady().delete(`image.${imageId}.metadata`);
+        }
+    },
+    
+    /**
+     * 获取图片列表
+     * @returns {Array<string>} 图片ID列表
+     */
+    getImageList: () => ensureDbReady().get('imageList', []),
+    
+    /**
+     * 获取图片列表详细信息
+     * @returns {Array<Object>} 图片信息列表，包含ID和元数据
+     */
+    getImageListDetails: () => {
+        const imageList = storage.getImageList();
+        return imageList.map(imageId => ({
+            id: imageId,
+            metadata: storage.getImageMetadata(imageId, {}),
+            hasData: storage.has(`image.${imageId}`)
+        }));
+    },
+    
+    /**
+     * 切换到指定图片
+     * @param {string} imageId - 图片唯一ID
+     * @returns {boolean} 是否切换成功
+     */
+    switchToImage: (imageId) => {
+        if (storage.has(`image.${imageId}`)) {
+            storage.setCurrentImage(imageId);
+            return true;
+        }
+        return false;
+    },
+    
+    /**
+     * 获取下一张图片ID
+     * @param {string} currentImageId - 当前图片ID
+     * @returns {string|null} 下一张图片ID，如果没有则返回null
+     */
+    getNextImage: (currentImageId) => {
+        const imageList = storage.getImageList();
+        const currentIndex = imageList.indexOf(currentImageId);
+        if (currentIndex > -1 && currentIndex < imageList.length - 1) {
+            return imageList[currentIndex + 1];
+        }
+        return null;
+    },
+    
+    /**
+     * 获取上一张图片ID
+     * @param {string} currentImageId - 当前图片ID
+     * @returns {string|null} 上一张图片ID，如果没有则返回null
+     */
+    getPreviousImage: (currentImageId) => {
+        const imageList = storage.getImageList();
+        const currentIndex = imageList.indexOf(currentImageId);
+        if (currentIndex > 0) {
+            return imageList[currentIndex - 1];
+        }
+        return null;
+    },
+    
+    /**
      * 设置配置项
      * @param {string} key - 配置键名
      * @param {any} value - 配置值
