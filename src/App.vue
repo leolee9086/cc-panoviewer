@@ -24,7 +24,6 @@
              class="context-menu">
             <ul>
                 <li @click="handleContextMenuAction('export-page')">导出页面（选择图片和压缩）</li>
-                <li @click="handleContextMenuAction('download-page')">下载当前页面（含数据）</li>
                 <li @click="handleContextMenuAction('download-empty-page')">下载空页面（无数据）</li>
                 <li @click="handleContextMenuAction('export-video')">导出视频</li>
             </ul>
